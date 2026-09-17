@@ -10,6 +10,7 @@ const LANGUAGE_META = [
   { code: "en", label: "English" },
   { code: "tr", label: "Türkçe" },
   { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
 ];
 
 window.LANGUAGE_META = LANGUAGE_META;
