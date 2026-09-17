@@ -27,6 +27,8 @@ GitHub Pages as plain static files.
 
 ## Canlı site / Live site
 
+**https://alplix.github.io/sessiz-arsiv-web/**
+
 Firebase kurulumu tamamlanana kadar oyun **giriş yapılmadan (misafir
 modu) yerel kayıtla** oynanabilir durumda; hesap/liderlik özellikleri
 `js/firebase-config.js` doldurulunca aktif olur.
