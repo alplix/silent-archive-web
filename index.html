@@ -57,17 +57,50 @@
 
 <div id="game-screen" class="screen hidden">
   <div id="topbar">
-    <span id="topbar-user"></span>
+    <span class="topbar-left">
+      <button id="sidebar-toggle" class="link-btn" aria-label="menu">☰</button>
+      <span id="topbar-user"></span>
+    </span>
     <span class="topbar-actions">
+      <button id="sfx-toggle" class="link-btn">🔊</button>
       <button id="tutorial-btn" class="link-btn" data-i18n="tut_button">…</button>
       <button id="leaderboard-btn" class="link-btn" data-i18n="nav_leaderboard">…</button>
       <button id="logout-btn" class="link-btn" data-i18n="nav_logout">…</button>
     </span>
   </div>
-  <div id="terminal"></div>
-  <div id="input-row">
-    <span id="prompt-tag">&gt;</span>
-    <input type="text" id="cmd-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+
+  <div id="game-body">
+    <div id="sidebar">
+      <div id="dashboard">
+        <div class="stat-row"><span class="stat-label" data-i18n="st_clearance">…</span><span id="stat-clearance" class="stat-val"></span></div>
+        <div class="stat-row"><span class="stat-label" data-i18n="st_day">…</span><span id="stat-day" class="stat-val"></span></div>
+        <div class="stat-row"><span class="stat-label" data-i18n="st_findings">…</span><span id="stat-findings" class="stat-val"></span></div>
+        <div class="stat-block">
+          <div class="stat-block-top"><span class="stat-label" data-i18n="st_contam">…</span><span id="stat-contam-pct" class="stat-val"></span></div>
+          <div class="meter"><div id="meter-contam" class="meter-fill"></div></div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-block-top"><span id="stat-rank" class="stat-val rank"></span><span id="stat-xp" class="stat-val"></span></div>
+          <div class="meter"><div id="meter-xp" class="meter-fill xp"></div></div>
+        </div>
+      </div>
+
+      <div id="cross-tray" class="hidden">
+        <div id="cross-tray-label" data-i18n="cross_tray_hint">…</div>
+        <div id="cross-tray-picks"></div>
+        <button id="cross-tray-go" data-i18n="cross_tray_go">…</button>
+      </div>
+
+      <div id="record-browser"></div>
+    </div>
+
+    <div id="main-pane">
+      <div id="terminal"></div>
+      <div id="input-row">
+        <span id="prompt-tag">&gt;</span>
+        <input type="text" id="cmd-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
   </div>
 </div>
 
@@ -100,6 +133,7 @@
 <script type="module" src="js/auth.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/sfx.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

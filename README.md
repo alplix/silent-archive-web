@@ -116,6 +116,22 @@ firestore.rules         Firebase Console > Firestore > Rules'a yapıştırın
 
 ## Özellikler / Features
 
+- **Kenar çubuğu**: her an görünen bir durum paneli (yetki, gün,
+  bulgu sayısı, kontaminasyon ve XP barları), ve tıklanabilir bir
+  kayıt listesi — bir kaydı okumak için tıklayın, iki okunmuş kaydı
+  onay kutularıyla seçip "Karşılaştır"a basarak çapraz referans
+  yapın; komut yazmak hâlâ çalışır, sadece artık zorunlu değil. /
+  **Sidebar**: an always-visible status panel (clearance, day,
+  findings count, contamination and XP bars), and a clickable record
+  list — click to read a record, check two you've read and hit
+  "Compare" to cross-reference them; typing commands still works,
+  it's just no longer required.
+- **Ses efektleri**: yeni bulgu, rütbe atlama, yüksek kontaminasyon
+  ve son gibi anlarda kısa, sentezlenmiş sesler (Web Audio API,
+  harici ses dosyası yok); üst çubuktaki 🔊 ile kapatılabilir. /
+  **Sound effects**: short synthesized cues (Web Audio API, no audio
+  files) for new findings, rank-ups, high contamination and endings;
+  toggle off with the 🔊 button in the topbar.
 - **Dil seçimi giriş ekranının üstünde** (sağ üstte sabit TR/EN
   düğmesi) — seçilen dil giriş formunu, üst çubuğu, liderlik
   tablosunu ve arşiv içeriğinin tamamını kapsar, oyun içinde de

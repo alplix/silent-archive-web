@@ -821,7 +821,9 @@ const Engine = (() => {
   return {
     boot, T, fold, newState, getState, setState,
     runCommand, isYes, prompt, loadSanitizedState,
+    accessible, accessibleRecords,
     get RECORDS() { return RECORDS; },
+    get RECORD_ORDER() { return RECORD_ORDER; },
     get FINDING_ORDER() { return FINDING_ORDER; },
     get RULES() { return RULES; },
     get RANKS() { return RANKS; },

@@ -19,6 +19,7 @@ let awaitingReportChoice = null;
 let gameOver = false;
 const history = [];
 let historyIdx = -1;
+let crossPicks = [];      // record ids picked in the sidebar for cross-referencing
 
 // ---------------------------------------------------------------------------
 // language switcher — visible on every screen, drives both the static site
@@ -78,7 +79,14 @@ async function boot() {
 // ---------------------------------------------------------------------------
 
 function wireAuthScreen() {
-  const tabs = document.querySelectorAll("#auth-tabs .tab");
+  // wireAuthScreen() can run more than once per page load (e.g. quit then
+  // log back in without a full reload) — clone-and-replace first so old
+  // listeners don't stack up and double-submit.
+  const tabs = [...document.querySelectorAll("#auth-tabs .tab")].map((tab) => {
+    const clone = tab.cloneNode(true);
+    tab.replaceWith(clone);
+    return clone;
+  });
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));
@@ -88,7 +96,7 @@ function wireAuthScreen() {
     });
   });
 
-  $("#login-form").addEventListener("submit", async (e) => {
+  freshEl("#login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#login-err").textContent = "";
     try {
@@ -99,7 +107,7 @@ function wireAuthScreen() {
     }
   });
 
-  $("#register-form").addEventListener("submit", async (e) => {
+  freshEl("#register-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#register-err").textContent = "";
     try {
@@ -114,7 +122,7 @@ function wireAuthScreen() {
     }
   });
 
-  $("#google-btn").addEventListener("click", async () => {
+  freshEl("#google-btn").addEventListener("click", async () => {
     try {
       currentUser = await Auth.loginWithGoogle();
       startGame(window.I18N.getUiLang());
@@ -123,7 +131,7 @@ function wireAuthScreen() {
     }
   });
 
-  $("#guest-btn").addEventListener("click", () => {
+  freshEl("#guest-btn").addEventListener("click", () => {
     currentUser = null; // pure local/guest mode, no Firebase involved
     startGame(window.I18N.getUiLang());
   });
@@ -167,16 +175,194 @@ async function startGame(langCode) {
   E.setState(state);
 
   inGame = true;
+  crossPicks = [];
   showScreen("game");
   $("#terminal").innerHTML = "";
   updateTopbarText();
 
   printIntro();
   updatePromptTag();
+  renderDashboard();
+  renderRecordBrowser();
+  wireSidebar();
   wireInput();
   $("#cmd-input").focus();
 
   maybeShowTutorial();
+}
+
+// ---------------------------------------------------------------------------
+// sidebar: dashboard stats, clickable record browser, cross-reference tray
+// ---------------------------------------------------------------------------
+
+function renderDashboard() {
+  const E = window.Engine;
+  const s = E.getState();
+
+  $("#stat-clearance").textContent = `${s.clearance} / ${E.RULES.clearance_max}`;
+  $("#stat-day").textContent = `${s.day} / ${E.RULES.days_max}`;
+  $("#stat-findings").textContent = `${s.findings.length} / ${E.FINDING_ORDER.length}`;
+
+  const c = s.contam;
+  $("#stat-contam-pct").textContent = `${c}%`;
+  const contamMeter = $("#meter-contam");
+  contamMeter.style.width = c + "%";
+  contamMeter.className = "meter-fill" + (c >= 70 ? " danger" : c >= 40 ? " warn" : "");
+
+  const idx = E.rankIndex(s.xp);
+  $("#stat-rank").textContent = E.rankName(idx);
+  const ranks = E.RANKS;
+  const next = ranks[idx + 1];
+  const xpMeter = $("#meter-xp");
+  if (next) {
+    const prevAt = ranks[idx].at;
+    const pct = Math.min(100, Math.round(((s.xp - prevAt) / (next.at - prevAt)) * 100));
+    xpMeter.style.width = pct + "%";
+    $("#stat-xp").textContent = `${s.xp} / ${next.at}`;
+  } else {
+    xpMeter.style.width = "100%";
+    $("#stat-xp").textContent = `${s.xp}`;
+  }
+}
+
+function renderRecordBrowser() {
+  const E = window.Engine;
+  const s = E.getState();
+  const t = window.I18N.t;
+  const box = $("#record-browser");
+  box.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "rb-act-header";
+  header.style.marginTop = "0";
+  header.textContent = t("browser_title");
+  box.appendChild(header);
+
+  const accessible = E.RECORD_ORDER.filter((rid) => E.accessible(rid));
+  if (!accessible.length) {
+    const p = document.createElement("div");
+    p.className = "rb-tag";
+    p.textContent = t("browser_empty");
+    box.appendChild(p);
+    return;
+  }
+
+  let currentAct = null;
+  for (const rid of accessible) {
+    const meta = E.RECORDS[rid];
+    if (meta.act !== currentAct) {
+      currentAct = meta.act;
+      const h = document.createElement("div");
+      h.className = "rb-act-header";
+      h.textContent = E.T("acts", String(currentAct), "title", { default: "ACT " + currentAct });
+      box.appendChild(h);
+    }
+    const isRead = s.read.includes(rid);
+    const row = document.createElement("div");
+    row.className = "rb-row" + (isRead ? " read" : "");
+
+    if (isRead) {
+      const check = document.createElement("span");
+      check.className = "rb-check" + (crossPicks.includes(rid) ? " picked" : "");
+      check.textContent = crossPicks.includes(rid) ? "✓" : "";
+      check.addEventListener("click", (e) => { e.stopPropagation(); toggleCrossPick(rid); });
+      row.appendChild(check);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "rb-check";
+      spacer.style.visibility = "hidden";
+      row.appendChild(spacer);
+    }
+
+    const name = document.createElement("span");
+    name.className = "rb-name";
+    name.textContent = (E.T("records", rid, "name", { default: rid }));
+    row.appendChild(name);
+
+    if (isRead) {
+      const tag = document.createElement("span");
+      tag.className = "rb-tag";
+      tag.textContent = "✓";
+      row.appendChild(tag);
+    }
+
+    row.addEventListener("click", () => {
+      window.SFX.open();
+      handleLine("read " + rid);
+    });
+    box.appendChild(row);
+  }
+}
+
+function toggleCrossPick(rid) {
+  const idx = crossPicks.indexOf(rid);
+  if (idx >= 0) {
+    crossPicks.splice(idx, 1);
+  } else {
+    if (crossPicks.length >= 2) crossPicks.shift();
+    crossPicks.push(rid);
+  }
+  window.SFX.key();
+  renderRecordBrowser();
+  renderCrossTray();
+}
+
+function renderCrossTray() {
+  const E = window.Engine;
+  const t = window.I18N.t;
+  const tray = $("#cross-tray");
+  if (!crossPicks.length) { tray.classList.add("hidden"); return; }
+  tray.classList.remove("hidden");
+  $("#cross-tray-label").textContent = crossPicks.length < 2 ? t("cross_tray_need_one_more") : t("cross_tray_hint");
+
+  const picksBox = $("#cross-tray-picks");
+  picksBox.innerHTML = "";
+  for (const rid of crossPicks) {
+    const row = document.createElement("div");
+    row.className = "cross-pick";
+    const name = document.createElement("span");
+    name.textContent = E.T("records", rid, "name", { default: rid });
+    const rm = document.createElement("button");
+    rm.textContent = "×";
+    rm.addEventListener("click", () => toggleCrossPick(rid));
+    row.appendChild(name);
+    row.appendChild(rm);
+    picksBox.appendChild(row);
+  }
+
+  const goBtn = $("#cross-tray-go");
+  goBtn.disabled = crossPicks.length !== 2;
+  goBtn.textContent = t("cross_tray_go");
+}
+
+// Re-wired every time startGame() runs (e.g. quit then log back in without a
+// full page reload) — clone-and-replace each button first so stale listeners
+// from a previous game session don't stack up and double-fire.
+function freshEl(sel) {
+  const el = $(sel);
+  const clone = el.cloneNode(true);
+  el.replaceWith(clone);
+  return clone;
+}
+
+function wireSidebar() {
+  freshEl("#cross-tray-go").addEventListener("click", () => {
+    if (crossPicks.length !== 2) return;
+    const [a, b] = crossPicks;
+    crossPicks = [];
+    renderRecordBrowser();
+    renderCrossTray();
+    handleLine(`cross ${a} ${b}`);
+  });
+  freshEl("#sidebar-toggle").addEventListener("click", () => {
+    $("#sidebar").classList.toggle("open");
+  });
+  const sfxBtn = freshEl("#sfx-toggle");
+  sfxBtn.addEventListener("click", () => {
+    window.SFX.setMuted(!window.SFX.isMuted());
+    $("#sfx-toggle").textContent = window.SFX.isMuted() ? "🔇" : "🔊";
+  });
+  sfxBtn.textContent = window.SFX.isMuted() ? "🔇" : "🔊";
 }
 
 // ---------------------------------------------------------------------------
@@ -334,23 +520,49 @@ function wireInput() {
         fresh.value = history[historyIdx] || "";
       }
       e.preventDefault();
+    } else if (e.key.length === 1 || e.key === "Backspace") {
+      window.SFX.key();
     }
   });
   fresh.disabled = false;
 }
 
+function refreshSidebar() {
+  renderDashboard();
+  renderRecordBrowser();
+  renderCrossTray();
+}
+
+// Compares state before/after a command to fire the right sound cue — takes
+// plain-number snapshots (not the live state object) since findings/etc are
+// mutated in place by the engine and a shallow copy would alias them.
+function snapshot(s) {
+  return { findingsCount: s.findings.length, rankSeen: s.rank_seen, contam: s.contam };
+}
+function playCueFor(before, s) {
+  const after = snapshot(s);
+  if (after.findingsCount > before.findingsCount) { window.SFX.finding(); return; }
+  if (after.rankSeen > before.rankSeen) { window.SFX.rankUp(); return; }
+  if (after.contam >= 70 && before.contam < 70) { window.SFX.danger(); return; }
+  if (after.contam >= 40 && before.contam < 40) { window.SFX.warning(); return; }
+}
+
 async function handleLine(raw) {
   if (gameOver) return;
   const E = window.Engine;
+  window.SFX.submit();
   printLine("");
 
   if (awaitingConfirm) {
     const fn = awaitingConfirm;
     awaitingConfirm = null;
+    const before = snapshot(E.getState());
     const res = fn(E.isYes(raw));
     await printLines(res.lines);
+    playCueFor(before, E.getState());
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
+    refreshSidebar();
     persist();
     return;
   }
@@ -361,6 +573,7 @@ async function handleLine(raw) {
     await printLines(res.lines);
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
+    refreshSidebar();
     persist();
     return;
   }
@@ -371,6 +584,7 @@ async function handleLine(raw) {
     return;
   }
 
+  const before = snapshot(E.getState());
   const result = E.runCommand(raw);
   if (!result) return;
 
@@ -384,6 +598,7 @@ async function handleLine(raw) {
     await reloadSave();
     printLine(E.T("ui", "loaded"), "cyan");
     updatePromptTag();
+    refreshSidebar();
     return;
   }
   if (result.hostVerb === "quit") {
@@ -402,6 +617,7 @@ async function handleLine(raw) {
   }
 
   await printLines(result.lines);
+  playCueFor(before, E.getState());
 
   if (result.pendingConfirm) awaitingConfirm = result.pendingConfirm;
   if (result.pendingReportChoice) awaitingReportChoice = result.pendingReportChoice;
@@ -409,12 +625,14 @@ async function handleLine(raw) {
   if (result.ended) handleEnding(result.ended);
 
   updatePromptTag();
+  refreshSidebar();
   persist();
 }
 
 function handleEnding(ended) {
   gameOver = true;
   $("#cmd-input").disabled = true;
+  window.SFX.ending();
   clearSave();
   printLine("");
   printLine(window.I18N.t("session_ended_1"), "dim amber");
