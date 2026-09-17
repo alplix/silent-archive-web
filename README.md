@@ -6,10 +6,11 @@ saves. The game and all content (565 records, 303 findings) are identical
 to the original Python/terminal version — this repo just re-implements the
 same engine to run client-side, reading the same data files unchanged.
 
-**This is a fully static site.** No server-side code, no SQL. Accounts,
-saved progress and the leaderboard use a free Firebase project (NoSQL,
-hosted by Google — you don't run a server). The site itself sits on
-GitHub Pages as plain static files.
+**This is a fully static site.** No server-side code, no SQL, and no
+third-party backend at all — everything, including accounts, saved
+progress and the leaderboard, lives in this GitHub repo. The site itself
+sits on GitHub Pages as plain static files; a small GitHub Actions
+workflow is what makes "cloud save" possible without a server.
 
 ---
 
@@ -17,9 +18,10 @@ GitHub Pages as plain static files.
 
 **https://alplix.github.io/silent-archive-web/**
 
-Until Firebase is configured, the game is fully playable in **guest mode**
-(local browser save only); accounts/leaderboard activate once
-`js/firebase-config.js` is filled in.
+The game is always playable in **guest mode** (local browser save only,
+no account needed). Entering a GitHub username on the login screen adds
+cross-device sync and a public leaderboard — see below for how that works
+and its one-time repo setup.
 
 ## Run locally
 
@@ -32,20 +34,44 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-## Firebase setup (for accounts / leaderboard / cloud save) — optional but recommended
+## How "accounts" work without a backend
 
-1. Create a free project at https://console.firebase.google.com/.
-2. Enable "Email/Password" (and optionally "Google") under
-   **Build > Authentication > Sign-in method**.
-3. Create a Firestore database (production mode) under
-   **Build > Firestore Database**.
-4. Register a Web app under **Project settings > General > Your apps**
-   and copy the `firebaseConfig` object it gives you.
-5. Paste those values into `js/firebase-config.js` (these values are not
-   secret — security comes from Firestore Rules, see below).
-6. Paste the contents of `firestore.rules` into
-   **Firestore Database > Rules** and publish.
-7. Commit and push — GitHub Pages redeploys automatically.
+There's no password, no third-party auth provider, no database — just
+GitHub itself:
+
+1. On the login screen, a player types their **GitHub username**. This is
+   not verified at this point — it only tells the site which save file to
+   look for (`data/saves/<username>.json`, read directly from
+   `raw.githubusercontent.com`, no auth needed for a public repo).
+2. To actually save progress, the player clicks **"Sync to GitHub"** in
+   the topbar. This opens a pre-filled *new issue* page on this repo,
+   labeled `sync`, with their current progress as a JSON block in the
+   body. They review and submit it themselves, from their own logged-in
+   GitHub account.
+3. `.github/workflows/sync-save.yml` reacts to that issue. It uses the
+   issue's real author (`github.event.issue.user.login` — set by GitHub,
+   never anything the issue body claims) as the identity, validates the
+   payload, and commits `data/saves/<username>.json` plus an updated
+   `data/leaderboard.json`. Nothing this repo doesn't already have
+   (GitHub's own automatic `GITHUB_TOKEN`) is needed to do this — there is
+   no secret to create or paste anywhere.
+4. It closes the issue with a ✅ or ❌ comment once done.
+
+This is intentionally a trade-off, not a full accounts system: it's not
+password-protected (anyone can type any username and see that public save
+or leaderboard entry — there's nothing private here, it's all committed to
+a public repo), and syncing is a manual, occasional action rather than
+continuous — the always-on save is still plain `localStorage`, exactly
+like guest mode. See `js/auth.js` for the full reasoning.
+
+### One-time repo setup (only needed once, by the repo owner)
+
+1. **Settings > Actions > General > Workflow permissions** — select
+   "Read and write permissions" (so the sync workflow can commit).
+2. Create the `sync` label once: `gh label create sync --color 0e8a16` (or
+   **Issues > Labels > New label** in the GitHub UI).
+
+That's it — no accounts to register, no keys to copy anywhere.
 
 ## GitHub Pages
 
@@ -56,23 +82,25 @@ laid out to be served as-is from the repository root.
 ## Architecture
 
 ```
-index.html             auth, language, game screens
-style.css               terminal look and feel
-js/languages.js          registry of available languages (add a language here)
-js/engine.js             a faithful JS port of scp.py;
-                         reads manifest.json + dil/*.json unchanged
-js/firebase-config.js   your Firebase project config (you fill this in)
-js/auth.js               Firebase Auth/Firestore wrapper: accounts, cloud
-                         save, leaderboard
-js/i18n.js                site-chrome localization (auth form, topbar,
-                         leaderboard, tutorial, toasts)
-js/sfx.js                  synthesized sound effects (Web Audio API)
-js/main.js                 wires screens together, renders the terminal
-data/manifest.json       unchanged copy from the original Python project
-data/dil/en.json          unchanged copies from the original Python project
+index.html                       auth, language, game screens
+style.css                        terminal look and feel
+js/languages.js                  registry of available languages (add a language here)
+js/engine.js                     a faithful JS port of scp.py;
+                                  reads manifest.json + dil/*.json unchanged
+js/auth.js                       GitHub-native "accounts": username, cloud
+                                  save read, leaderboard read, sync-issue opener
+js/i18n.js                       site-chrome localization (login form, topbar,
+                                  leaderboard, tutorial, toasts)
+js/sfx.js                        synthesized sound effects (Web Audio API)
+js/main.js                       wires screens together, renders the terminal
+data/manifest.json               unchanged copy from the original Python project
+data/dil/en.json                 unchanged copies from the original Python project
 data/dil/tr.json
 data/dil/es.json
-firestore.rules          paste into Firebase Console > Firestore > Rules
+data/saves/<username>.json       written by the sync workflow, one per player
+data/leaderboard.json            written by the sync workflow
+.github/workflows/sync-save.yml  processes "sync" issues into the files above
+.github/scripts/sync-issue.js    validates and writes the payload (called by the workflow)
 ```
 
 ## Features
@@ -101,8 +129,11 @@ firestore.rules          paste into Firebase Console > Firestore > Rules
   the goal, object classes, clearance levels, contamination, the
   finding/cross-reference mechanic and the 11-day clock; reopenable
   anytime from the topbar button.
-- In guest mode (no login), progress is saved only to that browser's
-  `localStorage` — no cross-device sync, not included in the leaderboard.
+- **GitHub-native sync and leaderboard** — no Firebase, no third-party
+  service; see "How 'accounts' work" above.
+- In guest mode (no username entered), progress is saved only to that
+  browser's `localStorage` — no cross-device sync, not included in the
+  leaderboard.
 
 ## License
 

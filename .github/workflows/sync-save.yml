@@ -1,0 +1,54 @@
+name: Sync save / leaderboard
+
+# Reacts to issues opened by the game's "Sync to GitHub" button (always
+# labeled "sync"). Writes data/saves/<author>.json and updates
+# data/leaderboard.json, using the issue's real author as identity — never
+# anything the issue body claims — so a player can only overwrite their own
+# data. See js/auth.js and .github/scripts/sync-issue.js for the full story.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    if: contains(github.event.issue.labels.*.name, 'sync')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Process the sync issue
+        id: sync
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+        run: node .github/scripts/sync-issue.js
+
+      - name: Commit and push
+        if: steps.sync.outputs.status == 'ok'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/saves data/leaderboard.json
+          git commit -m "sync: ${{ steps.sync.outputs.username }}"
+          git push
+
+      - name: Comment and close (success)
+        if: steps.sync.outputs.status == 'ok'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "✅ ${{ steps.sync.outputs.message }}"
+          gh issue close "${{ github.event.issue.number }}"
+
+      - name: Comment and close (rejected)
+        if: steps.sync.outputs.status == 'rejected'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "❌ Could not sync: ${{ steps.sync.outputs.message }}"
+          gh issue close "${{ github.event.issue.number }}"

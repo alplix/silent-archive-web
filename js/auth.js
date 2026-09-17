@@ -1,128 +1,137 @@
 // ---------------------------------------------------------------------------
-// Auth + cloud save + leaderboard, backed by Firebase (Auth + Firestore).
-// See firebase-config.js for setup instructions. This module degrades
-// gracefully (throws readable errors) if Firebase hasn't been configured yet.
+// "Accounts" + cloud save + leaderboard, backed entirely by GitHub itself —
+// no Firebase, no third-party service, no secret embedded in this file.
+//
+// How it works:
+// - Identity is just a GitHub username the player types in (stored locally,
+//   used only to know which save file to read). It is NOT verified on read.
+// - Writing (syncing progress / posting to the leaderboard) opens a
+//   pre-filled "new issue" page on GitHub for the player to submit
+//   themselves, while logged into their own GitHub account. A repo
+//   workflow (.github/workflows/sync-save.yml) reacts to that issue and
+//   commits the save/leaderboard files. Crucially, the workflow trusts
+//   the issue's REAL author (`issue.user.login`, set by GitHub itself) as
+//   the identity for the write — never anything the client claims — so a
+//   player can only ever overwrite their own save/leaderboard entry.
+// - Reading (resuming a save, loading the leaderboard) is a plain GET of a
+//   public JSON file from raw.githubusercontent.com. No auth needed.
+//
+// Trade-offs, on purpose, given the constraint of "everything on GitHub,
+// nothing else": this is not real authentication (anyone can type any
+// username and see that public save/leaderboard entry), syncing is a
+// manual, explicit action rather than continuous, and there is a short
+// delay (the workflow run) between submitting and the sync being visible.
 // ---------------------------------------------------------------------------
 
-import { firebaseConfig, FIREBASE_CONFIGURED } from "./firebase-config.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signInAnonymously, signOut, onAuthStateChanged, updateProfile,
-  GoogleAuthProvider, signInWithPopup,
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import {
-  getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+const OWNER = "alplix";
+const REPO = "silent-archive-web";
+const BRANCH = "main";
+const SYNC_LABEL = "sync";
+const USERNAME_KEY = "silent-archive-github-user";
 
-let app = null, auth = null, db = null;
+const USERNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 
-function ensureInit() {
-  if (!FIREBASE_CONFIGURED) {
-    throw new Error(
-      "Firebase henüz yapılandırılmadı. js/firebase-config.js dosyasına " +
-      "kendi Firebase proje bilgilerinizi girin. / Firebase is not " +
-      "configured yet — fill in js/firebase-config.js with your project's values."
-    );
-  }
-  if (!app) {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  }
+function rawUrl(path) {
+  return `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}?t=${Date.now()}`;
 }
 
 export function isConfigured() {
-  return FIREBASE_CONFIGURED;
+  return true; // nothing to configure — this always works on GitHub Pages
 }
 
+export function isValidUsername(name) {
+  return typeof name === "string" && USERNAME_RE.test(name);
+}
+
+export function getUsername() {
+  try { return localStorage.getItem(USERNAME_KEY); } catch { return null; }
+}
+
+export function setUsername(name) {
+  try {
+    if (name) localStorage.setItem(USERNAME_KEY, name);
+    else localStorage.removeItem(USERNAME_KEY);
+  } catch { /* ignore */ }
+}
+
+// Mirrors the old Firebase-based watchAuth(cb) shape so main.js's boot()
+// logic barely has to change: calls back once with a user-ish object
+// ({ username }) or null, and returns an unsubscribe function (a no-op
+// here, since there is no live session to watch).
 export function watchAuth(cb) {
-  if (!FIREBASE_CONFIGURED) { cb(null); return () => {}; }
-  ensureInit();
-  return onAuthStateChanged(auth, cb);
+  const name = getUsername();
+  cb(name ? { username: name } : null);
+  return () => {};
 }
 
-export async function registerWithEmail(name, email, password) {
-  ensureInit();
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(cred.user, { displayName: name });
-  await setDoc(doc(db, "users", cred.user.uid), {
-    displayName: name,
-    createdAt: serverTimestamp(),
-  }, { merge: true });
-  return cred.user;
-}
-
-export async function loginWithEmail(email, password) {
-  ensureInit();
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  return cred.user;
-}
-
-export async function loginWithGoogle() {
-  ensureInit();
-  const provider = new GoogleAuthProvider();
-  const cred = await signInWithPopup(auth, provider);
-  await setDoc(doc(db, "users", cred.user.uid), {
-    displayName: cred.user.displayName || "Denetçi",
-    createdAt: serverTimestamp(),
-  }, { merge: true });
-  return cred.user;
-}
-
-export async function playAsGuest() {
-  ensureInit();
-  const cred = await signInAnonymously(auth);
-  return cred.user;
+export function loginWithUsername(name) {
+  const trimmed = (name || "").trim();
+  if (!isValidUsername(trimmed)) {
+    throw new Error("err_bad_username");
+  }
+  setUsername(trimmed);
+  return { username: trimmed };
 }
 
 export async function logout() {
-  ensureInit();
-  await signOut(auth);
+  setUsername(null);
 }
 
 export function displayNameFor(user) {
-  return (user && (user.displayName || (user.isAnonymous ? "Misafir" : user.email))) || "Denetçi";
+  return (user && user.username) || "Auditor";
 }
 
-// ---- save / resume ----
+// ---- save / resume (read-only from the client's side) ----
 
-export async function loadSave(uid) {
-  ensureInit();
-  const snap = await getDoc(doc(db, "users", uid, "saves", "current"));
-  return snap.exists() ? snap.data() : null;
+export async function loadSave(username) {
+  if (!isValidUsername(username)) return null;
+  try {
+    const res = await fetch(rawUrl(`data/saves/${username.toLowerCase()}.json`), { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
-export async function writeSave(uid, state) {
-  ensureInit();
-  const { updatedAt, ...clean } = state;
-  await setDoc(doc(db, "users", uid, "saves", "current"), {
-    ...clean,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-// ---- leaderboard ----
-// One public-readable doc per user, overwritten whenever XP/findings change.
-
-export async function updateLeaderboardEntry(uid, displayName, entry) {
-  ensureInit();
-  await setDoc(doc(db, "leaderboard", uid), {
-    displayName,
-    xp: entry.xp,
-    rank: entry.rank,
-    findings: entry.findings,
-    clearance: entry.clearance,
-    updatedAt: serverTimestamp(),
-  });
-}
+// ---- leaderboard (read-only from the client's side) ----
 
 export async function fetchLeaderboard(topN = 50) {
-  ensureInit();
-  const q = query(collection(db, "leaderboard"), orderBy("xp", "desc"), limit(topN));
-  const snap = await getDocs(q);
-  const rows = [];
-  snap.forEach(d => rows.push(d.data()));
-  return rows;
+  const res = await fetch(rawUrl("data/leaderboard.json"), { cache: "no-store" });
+  if (!res.ok) {
+    if (res.status === 404) return []; // no one has synced yet
+    throw new Error("HTTP " + res.status);
+  }
+  const data = await res.json();
+  const rows = Array.isArray(data) ? data : Object.values(data || {});
+  rows.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+  return rows.slice(0, topN);
+}
+
+// ---- the actual write path: open a pre-filled GitHub issue ----
+// The player reviews and submits it themselves, authenticated as whoever
+// they're logged in as on github.com — that's what makes the write safe
+// without any token living in this file.
+
+export function buildSyncUrl(state) {
+  const payload = {
+    lang: state.lang, day: state.day, clearance: state.clearance,
+    contam: state.contam, xp: state.xp, rank_seen: state.rank_seen,
+    read: state.read, findings: state.findings, amnestics: state.amnestics,
+    fast: state.fast,
+  };
+  const body =
+    "Opened automatically by The Silent Archive's \"Sync to GitHub\" button. " +
+    "Do not edit the block below — a workflow reads it verbatim.\n\n" +
+    "```json\n" + JSON.stringify(payload, null, 1) + "\n```\n";
+  const params = new URLSearchParams({
+    title: "sync: progress update",
+    body,
+    labels: SYNC_LABEL,
+  });
+  return `https://github.com/${OWNER}/${REPO}/issues/new?${params.toString()}`;
+}
+
+export function submitSync(state) {
+  window.open(buildSyncUrl(state), "_blank", "noopener");
 }

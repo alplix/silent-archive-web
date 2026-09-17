@@ -8,15 +8,13 @@
 const UI_STRINGS = {
   tr: {
     boot_connecting: "SCiPNET Terminali — bağlanıyor...",
-    tab_login: "Giriş",
-    tab_register: "Kayıt Ol",
-    lbl_email: "E-posta",
-    lbl_password: "Şifre",
-    lbl_name: "Denetçi adı",
-    btn_signin: "Giriş Yap",
-    btn_register: "Kayıt Ol",
+    github_hint: "İlerlemenizi GitHub'a kaydedip liderlik tablosuna girmek için GitHub kullanıcı adınızı yazın. Bu gerçek bir şifreli giriş değildir — sadece kayıtlarınızı hangi dosyada tutacağımızı bilmemizi sağlar; gerçek kimlik doğrulaması, GitHub'a \"Senkronize Et\" dediğinizde kendi hesabınızla açtığınız bir issue üzerinden yapılır.",
+    lbl_github_username: "GitHub kullanıcı adı",
+    github_username_ph: "kullaniciadi",
+    btn_continue: "Devam Et",
+    err_bad_username: "Geçersiz GitHub kullanıcı adı.",
+    btn_sync: "GitHub'a Senkronize Et",
     or_row: "veya",
-    btn_google: "Google ile giriş yap",
     btn_guest: "Misafir olarak oyna (kayıt olmadan)",
     nav_leaderboard: "liderlik",
     nav_logout: "çıkış",
@@ -51,14 +49,8 @@ const UI_STRINGS = {
     lb_col_findings: "Bulgu",
     btn_close: "Kapat",
     lb_loading: "...",
-    lb_not_configured: "Firebase yapılandırılmadı — liderlik tablosu için site sahibinin js/firebase-config.js dosyasını doldurması gerekiyor.",
     lb_empty: "Henüz kimse yok.",
     lb_error: "Yüklenemedi: ",
-    err_email_in_use: "Bu e-posta zaten kayıtlı.",
-    err_wrong_credentials: "Hatalı e-posta veya şifre.",
-    err_weak_password: "Şifre en az 6 karakter olmalı.",
-    err_user_not_found: "Hesap bulunamadı.",
-    err_not_configured: "Firebase henüz yapılandırılmadı. Site sahibi js/firebase-config.js dosyasını doldurmalı.",
     session_ended_1: ">> oturum sona erdi",
     session_ended_2: ">> yeniden başlamak için sayfayı yenileyin",
     tut_title: "NASIL OYNANIR",
@@ -76,15 +68,13 @@ const UI_STRINGS = {
   },
   en: {
     boot_connecting: "SCiPNET Terminal — connecting...",
-    tab_login: "Login",
-    tab_register: "Register",
-    lbl_email: "Email",
-    lbl_password: "Password",
-    lbl_name: "Auditor name",
-    btn_signin: "Sign In",
-    btn_register: "Create Account",
+    github_hint: "Enter your GitHub username to sync progress to GitHub and appear on the leaderboard. This isn't a real password-protected login — it only tells us which save file to look for; the actual identity check happens when you hit \"Sync to GitHub\" and submit it from your own GitHub account.",
+    lbl_github_username: "GitHub username",
+    github_username_ph: "username",
+    btn_continue: "Continue",
+    err_bad_username: "Invalid GitHub username.",
+    btn_sync: "Sync to GitHub",
     or_row: "or",
-    btn_google: "Sign in with Google",
     btn_guest: "Play as guest (no account)",
     nav_leaderboard: "leaderboard",
     nav_logout: "logout",
@@ -119,14 +109,8 @@ const UI_STRINGS = {
     lb_col_findings: "Findings",
     btn_close: "Close",
     lb_loading: "...",
-    lb_not_configured: "Firebase is not configured — the leaderboard needs the site owner to fill in js/firebase-config.js.",
     lb_empty: "Nobody yet.",
     lb_error: "Failed to load: ",
-    err_email_in_use: "This email is already registered.",
-    err_wrong_credentials: "Wrong email or password.",
-    err_weak_password: "Password must be at least 6 characters.",
-    err_user_not_found: "Account not found.",
-    err_not_configured: "Firebase is not configured yet. The site owner needs to fill in js/firebase-config.js.",
     session_ended_1: ">> session ended",
     session_ended_2: ">> refresh the page to start a new run",
     tut_title: "HOW TO PLAY",
@@ -146,13 +130,19 @@ const UI_STRINGS = {
 
 const STORE_KEY = "silent-archive-ui-lang";
 
+function knownCodes() {
+  const meta = (typeof window !== "undefined" && window.LANGUAGE_META) || [];
+  return meta.length ? meta.map((m) => m.code) : Object.keys(UI_STRINGS);
+}
+
 function detectDefaultLang() {
+  const codes = knownCodes();
   try {
     const stored = localStorage.getItem(STORE_KEY);
-    if (stored && UI_STRINGS[stored]) return stored;
+    if (stored && codes.includes(stored)) return stored;
   } catch { /* ignore */ }
-  const nav = (navigator.language || "en").toLowerCase();
-  return nav.startsWith("tr") ? "tr" : "en";
+  const nav = (navigator.language || "en").toLowerCase().slice(0, 2);
+  return codes.includes(nav) ? nav : "en";
 }
 
 let currentLang = detectDefaultLang();
@@ -164,14 +154,15 @@ function t(key) {
 function getUiLang() { return currentLang; }
 
 function setUiLang(code) {
-  if (!UI_STRINGS[code]) return;
+  // currentLang can be a code with no UI_STRINGS block yet (chrome falls
+  // back to English per-key in t()); the game content still switches via
+  // Engine regardless, since that has its own fallback chain.
   currentLang = code;
   try { localStorage.setItem(STORE_KEY, code); } catch { /* ignore */ }
   document.documentElement.lang = code;
   applyStaticI18n();
-  document.querySelectorAll(".lang-opt").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.lang === code);
-  });
+  const sel = document.getElementById("lang-select");
+  if (sel && sel.value !== code) sel.value = code;
 }
 
 function applyStaticI18n() {

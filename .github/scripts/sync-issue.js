@@ -1,0 +1,128 @@
+// Processes a "sync" issue opened by The Silent Archive's "Sync to GitHub"
+// button. Reads the issue body/author from env vars set by the workflow,
+// validates everything defensively (this runs against arbitrary public
+// input — any GitHub user can open an issue with this label), and writes
+// data/saves/<username>.json + updates data/leaderboard.json.
+//
+// Security note: the username used for the save file and leaderboard
+// entry comes from ISSUE_USER (the issue's real author, set by GitHub
+// itself, passed in by the workflow from `github.event.issue.user.login`)
+// — never from anything inside the issue body. That's what makes it safe
+// for a player to only ever overwrite their own data.
+
+const fs = require("fs");
+const path = require("path");
+
+const REPO_ROOT = path.resolve(__dirname, "..", "..");
+const SAVES_DIR = path.join(REPO_ROOT, "data", "saves");
+const LEADERBOARD_PATH = path.join(REPO_ROOT, "data", "leaderboard.json");
+const RANKS_META = require(path.join(REPO_ROOT, "data", "manifest.json")).ranks || [];
+
+const USERNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+const MAX_BODY_LEN = 20000;
+const MAX_ARRAY_LEN = 2000;
+
+function fail(msg) {
+  console.error("REJECTED: " + msg);
+  writeOutput("status", "rejected");
+  writeOutput("message", msg);
+  process.exit(0); // exit 0 so the workflow can still comment+close cleanly
+}
+
+function writeOutput(name, value) {
+  const file = process.env.GITHUB_OUTPUT;
+  if (!file) return;
+  const safe = String(value).replace(/\r?\n/g, " ");
+  fs.appendFileSync(file, `${name}<<EOF\n${safe}\nEOF\n`);
+}
+
+function rankNameFor(xp) {
+  let name = RANKS_META[0] ? RANKS_META[0].id : "stajyer";
+  for (const r of RANKS_META) {
+    if (xp >= r.at) name = r.id;
+  }
+  return name;
+}
+
+function main() {
+  const username = process.env.ISSUE_USER || "";
+  const body = process.env.ISSUE_BODY || "";
+
+  if (!USERNAME_RE.test(username)) {
+    fail(`Issue author "${username}" is not a valid GitHub username shape — refusing to write.`);
+    return;
+  }
+  if (body.length > MAX_BODY_LEN) {
+    fail(`Issue body too large (${body.length} bytes, max ${MAX_BODY_LEN}).`);
+    return;
+  }
+
+  const match = body.match(/```json\s*([\s\S]*?)```/);
+  if (!match) {
+    fail("No ```json code block found in the issue body.");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(match[1]);
+  } catch (e) {
+    fail("Could not parse the JSON block: " + e.message);
+    return;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    fail("Payload is not a JSON object.");
+    return;
+  }
+
+  const { lang, day, clearance, contam, xp, rank_seen, read, findings, amnestics, fast } = payload;
+
+  const isSmallIntArray = (v) =>
+    Array.isArray(v) && v.length <= MAX_ARRAY_LEN && v.every((x) => typeof x === "string" && x.length <= 80);
+
+  if (typeof lang !== "string" || lang.length > 10) return fail("Invalid lang field.");
+  if (!Number.isInteger(day) || day < 0 || day > 1000) return fail("Invalid day field.");
+  if (!Number.isInteger(clearance) || clearance < 0 || clearance > 100) return fail("Invalid clearance field.");
+  if (!Number.isInteger(contam) || contam < 0 || contam > 100) return fail("Invalid contam field.");
+  if (!Number.isInteger(xp) || xp < 0 || xp > 1000000) return fail("Invalid xp field.");
+  if (!Number.isInteger(rank_seen) || rank_seen < 0 || rank_seen > 1000) return fail("Invalid rank_seen field.");
+  if (!isSmallIntArray(read)) return fail("Invalid read field.");
+  if (!isSmallIntArray(findings)) return fail("Invalid findings field.");
+  if (!Number.isInteger(amnestics) || amnestics < 0 || amnestics > 1000) return fail("Invalid amnestics field.");
+
+  const cleanState = {
+    lang, day, clearance, contam, xp, rank_seen, read, findings, amnestics,
+    fast: !!fast,
+    updatedAt: new Date().toISOString(),
+  };
+
+  fs.mkdirSync(SAVES_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(SAVES_DIR, `${username.toLowerCase()}.json`),
+    JSON.stringify(cleanState, null, 1) + "\n",
+    "utf8"
+  );
+
+  let leaderboard = {};
+  try {
+    leaderboard = JSON.parse(fs.readFileSync(LEADERBOARD_PATH, "utf8"));
+  } catch { /* file doesn't exist yet, or is empty — start fresh */ }
+  if (!leaderboard || typeof leaderboard !== "object" || Array.isArray(leaderboard)) leaderboard = {};
+
+  leaderboard[username.toLowerCase()] = {
+    username,
+    xp,
+    rank: rankNameFor(xp),
+    findings: findings.length,
+    clearance,
+    updatedAt: cleanState.updatedAt,
+  };
+
+  fs.writeFileSync(LEADERBOARD_PATH, JSON.stringify(leaderboard, null, 1) + "\n", "utf8");
+
+  writeOutput("status", "ok");
+  writeOutput("message", `Synced ${username}: ${xp} XP, ${findings.length} findings, clearance ${clearance}.`);
+  writeOutput("username", username.toLowerCase());
+}
+
+main();

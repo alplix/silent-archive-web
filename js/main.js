@@ -12,7 +12,7 @@ function showScreen(name) {
 
 const LOCAL_SAVE_KEY = "sessiz-arsiv-save-v1";
 
-let currentUser = null;   // Firebase user, or null for local/guest play
+let currentUser = null;   // { username } linked for GitHub sync, or null for local/guest play
 let inGame = false;
 let awaitingConfirm = null;
 let awaitingReportChoice = null;
@@ -27,10 +27,15 @@ let crossPicks = [];      // record ids picked in the sidebar for cross-referenc
 // ---------------------------------------------------------------------------
 
 function wireLangSwitch() {
-  window.I18N.setUiLang(window.I18N.getUiLang()); // paint + mark active button
-  document.querySelectorAll(".lang-opt").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const code = btn.dataset.lang;
+  const sel = $("#lang-select");
+  if (sel && !sel.dataset.wired) {
+    sel.dataset.wired = "1";
+    const meta = window.LANGUAGE_META || [{ code: "en", label: "English" }];
+    sel.innerHTML = meta
+      .map((m) => `<option value="${m.code}">${m.label}</option>`)
+      .join("");
+    sel.addEventListener("change", () => {
+      const code = sel.value;
       window.I18N.setUiLang(code);
       updateTopbarText();
       if (inGame) {
@@ -43,7 +48,8 @@ function wireLangSwitch() {
         }
       }
     });
-  });
+  }
+  window.I18N.setUiLang(window.I18N.getUiLang()); // paint + sync select value
 }
 
 // ---------------------------------------------------------------------------
@@ -59,8 +65,8 @@ async function boot() {
     return;
   }
 
-  // If Firebase is already configured and a session exists, skip the auth
-  // screen and resume directly.
+  // If a GitHub username is already linked, skip the auth screen and
+  // resume directly.
   let unsub;
   unsub = Auth.watchAuth((user) => {
     if (unsub) unsub();
@@ -82,49 +88,14 @@ function wireAuthScreen() {
   // wireAuthScreen() can run more than once per page load (e.g. quit then
   // log back in without a full reload) — clone-and-replace first so old
   // listeners don't stack up and double-submit.
-  const tabs = [...document.querySelectorAll("#auth-tabs .tab")].map((tab) => {
-    const clone = tab.cloneNode(true);
-    tab.replaceWith(clone);
-    return clone;
-  });
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-      $("#login-form").classList.toggle("hidden", tab.dataset.tab !== "login");
-      $("#register-form").classList.toggle("hidden", tab.dataset.tab !== "register");
-    });
-  });
+  const usernameField = $("#login-username");
+  if (usernameField) usernameField.value = Auth.getUsername() || "";
 
-  freshEl("#login-form").addEventListener("submit", async (e) => {
+  freshEl("#login-form").addEventListener("submit", (e) => {
     e.preventDefault();
     $("#login-err").textContent = "";
     try {
-      currentUser = await Auth.loginWithEmail($("#login-email").value, $("#login-password").value);
-      startGame(window.I18N.getUiLang());
-    } catch (err) {
-      $("#login-err").textContent = friendlyAuthError(err);
-    }
-  });
-
-  freshEl("#register-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    $("#register-err").textContent = "";
-    try {
-      currentUser = await Auth.registerWithEmail(
-        $("#register-name").value.trim() || window.I18N.t("operator_label"),
-        $("#register-email").value,
-        $("#register-password").value,
-      );
-      startGame(window.I18N.getUiLang());
-    } catch (err) {
-      $("#register-err").textContent = friendlyAuthError(err);
-    }
-  });
-
-  freshEl("#google-btn").addEventListener("click", async () => {
-    try {
-      currentUser = await Auth.loginWithGoogle();
+      currentUser = Auth.loginWithUsername($("#login-username").value);
       startGame(window.I18N.getUiLang());
     } catch (err) {
       $("#login-err").textContent = friendlyAuthError(err);
@@ -132,7 +103,7 @@ function wireAuthScreen() {
   });
 
   freshEl("#guest-btn").addEventListener("click", () => {
-    currentUser = null; // pure local/guest mode, no Firebase involved
+    currentUser = null; // pure local/guest mode, nothing synced to GitHub
     startGame(window.I18N.getUiLang());
   });
 }
@@ -140,11 +111,7 @@ function wireAuthScreen() {
 function friendlyAuthError(err) {
   const msg = String((err && err.message) || err);
   const t = window.I18N.t;
-  if (msg.includes("Firebase henüz") || msg.includes("not configured")) return t("err_not_configured");
-  if (msg.includes("auth/email-already-in-use")) return t("err_email_in_use");
-  if (msg.includes("auth/invalid-credential") || msg.includes("auth/wrong-password")) return t("err_wrong_credentials");
-  if (msg.includes("auth/weak-password")) return t("err_weak_password");
-  if (msg.includes("auth/user-not-found")) return t("err_user_not_found");
+  if (msg.includes("err_bad_username")) return t("err_bad_username");
   return msg;
 }
 
@@ -157,18 +124,19 @@ async function startGame(langCode) {
   const E = window.Engine;
   if (!E.LANGS[langCode]) langCode = E.BASE_LANG;
 
+  // Local save wins if present (always fresh — every command writes it).
+  // The GitHub-synced save is only for resuming on a fresh browser/device,
+  // since syncing is a manual, occasional action rather than continuous.
   let state = null;
-  if (currentUser && Auth.isConfigured()) {
+  const local = readLocalSave();
+  if (local) state = E.loadSanitizedState(local, langCode);
+  if (!state && currentUser) {
     try {
-      const cloud = await Auth.loadSave(currentUser.uid);
+      const cloud = await Auth.loadSave(currentUser.username);
       if (cloud) state = E.loadSanitizedState(cloud, langCode);
     } catch (err) {
-      console.warn("cloud load failed, falling back to local", err);
+      console.warn("GitHub save load failed, starting fresh", err);
     }
-  }
-  if (!state) {
-    const local = readLocalSave();
-    if (local) state = E.loadSanitizedState(local, langCode);
   }
   if (!state) state = E.newState(langCode);
   state.lang = langCode;
@@ -188,6 +156,7 @@ async function startGame(langCode) {
   wireBrowserTabsAndSearch();
   renderRecordBrowser();
   wireSidebar();
+  wireSyncButton();
   wireInput();
   $("#cmd-input").focus();
 
@@ -494,6 +463,7 @@ function updateTopbarText() {
   $("#topbar-user").textContent = currentUser
     ? `${window.I18N.t("operator_label")}: ${Auth.displayNameFor(currentUser)}`
     : window.I18N.t("guest_mode");
+  $("#sync-btn").classList.toggle("hidden", !currentUser);
 }
 
 async function printIntro() {
@@ -753,46 +723,30 @@ function writeLocalSave(state) {
 
 function clearSave() {
   try { localStorage.removeItem(LOCAL_SAVE_KEY); } catch { /* ignore */ }
-  if (currentUser && Auth.isConfigured()) {
-    Auth.writeSave(currentUser.uid, window.Engine.newState(window.Engine.getState().lang)).catch(() => {});
-  }
+  // Deliberately does not touch the GitHub-synced save: that sync only
+  // ever happens via an explicit player action (the "Sync to GitHub"
+  // button opening a real GitHub issue), never silently from here.
 }
 
-let saveTimer = null;
-async function persist(immediate = false) {
-  const E = window.Engine;
-  const state = E.getState();
-  writeLocalSave(state);
-  if (!currentUser || !Auth.isConfigured()) return;
-
-  const doWrite = async () => {
-    try {
-      await Auth.writeSave(currentUser.uid, state);
-      const idx = E.rankIndex(state.xp);
-      await Auth.updateLeaderboardEntry(currentUser.uid, Auth.displayNameFor(currentUser), {
-        xp: state.xp,
-        rank: E.rankName(idx),
-        findings: state.findings.length,
-        clearance: state.clearance,
-      });
-    } catch (err) {
-      console.warn("cloud save failed", err);
-    }
-  };
-  if (immediate) { await doWrite(); return; }
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(doWrite, 800);
+// Local save happens on every state-changing action (see handleLine()).
+// Syncing to GitHub is a separate, manual action (see wireSyncButton())
+// since it opens a real GitHub issue page rather than writing silently.
+function persist() {
+  writeLocalSave(window.Engine.getState());
 }
 
 async function reloadSave() {
   const E = window.Engine;
-  let data = null;
-  if (currentUser && Auth.isConfigured()) {
-    try { data = await Auth.loadSave(currentUser.uid); } catch { /* fall through */ }
-  }
-  if (!data) data = readLocalSave();
+  const data = readLocalSave();
   if (!data) return;
   E.setState(E.loadSanitizedState(data, E.getState().lang));
+}
+
+function wireSyncButton() {
+  freshEl("#sync-btn").addEventListener("click", () => {
+    if (!currentUser) return;
+    Auth.submitSync(window.Engine.getState());
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -805,16 +759,12 @@ async function openLeaderboard() {
   modal.classList.remove("hidden");
   const tbody = document.querySelector("#leaderboard-table tbody");
   tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_loading"))}</td></tr>`;
-  if (!Auth.isConfigured()) {
-    tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_not_configured"))}</td></tr>`;
-    return;
-  }
   try {
     const rows = await Auth.fetchLeaderboard(50);
     tbody.innerHTML = "";
     rows.forEach((r, i) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.displayName || "?")}</td><td>${escapeHtml(r.rank || "")}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
+      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.username || "?")}</td><td>${escapeHtml(r.rank || "")}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
       tbody.appendChild(tr);
     });
     if (!rows.length) tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_empty"))}</td></tr>`;
@@ -830,8 +780,8 @@ function escapeHtml(s) {
 $("#leaderboard-close").addEventListener("click", () => $("#leaderboard-modal").classList.add("hidden"));
 $("#leaderboard-btn").addEventListener("click", openLeaderboard);
 $("#logout-btn").addEventListener("click", async () => {
-  await persist(true);
-  if (currentUser && Auth.isConfigured()) { try { await Auth.logout(); } catch { /* ignore */ } }
+  persist();
+  if (currentUser) { try { await Auth.logout(); } catch { /* ignore */ } }
   currentUser = null;
   location.reload();
 });

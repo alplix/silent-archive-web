@@ -13,9 +13,7 @@
 <div id="tension-vignette"></div>
 
 <div id="lang-switch" class="lang-switch">
-  <button class="lang-opt" data-lang="tr">TR</button>
-  <span class="lang-sep">/</span>
-  <button class="lang-opt" data-lang="en">EN</button>
+  <select id="lang-select" aria-label="Language"></select>
 </div>
 
 <div id="boot-screen" class="screen">
@@ -32,28 +30,15 @@
   \__ \ (__| |  _/| .` | _|  | |
   |___/\___|_|_|  |_|\_|___| |_|</pre>
   <div class="panel">
-    <div id="auth-tabs" class="tabs">
-      <button class="tab active" data-tab="login" data-i18n="tab_login">…</button>
-      <button class="tab" data-tab="register" data-i18n="tab_register">…</button>
-    </div>
+    <p class="dim small" data-i18n="github_hint">…</p>
 
     <form id="login-form" class="auth-form">
-      <label><span data-i18n="lbl_email">…</span><input type="email" id="login-email" required autocomplete="email"></label>
-      <label><span data-i18n="lbl_password">…</span><input type="password" id="login-password" required autocomplete="current-password"></label>
-      <button type="submit" data-i18n="btn_signin">…</button>
+      <label><span data-i18n="lbl_github_username">…</span><input type="text" id="login-username" required maxlength="39" autocomplete="username" data-i18n-ph="github_username_ph"></label>
+      <button type="submit" data-i18n="btn_continue">…</button>
       <p class="err" id="login-err"></p>
     </form>
 
-    <form id="register-form" class="auth-form hidden">
-      <label><span data-i18n="lbl_name">…</span><input type="text" id="register-name" required maxlength="24"></label>
-      <label><span data-i18n="lbl_email">…</span><input type="email" id="register-email" required autocomplete="email"></label>
-      <label><span data-i18n="lbl_password">…</span><input type="password" id="register-password" required minlength="6" autocomplete="new-password"></label>
-      <button type="submit" data-i18n="btn_register">…</button>
-      <p class="err" id="register-err"></p>
-    </form>
-
     <div class="or-row"><span data-i18n="or_row">…</span></div>
-    <button id="google-btn" class="secondary" data-i18n="btn_google">…</button>
     <button id="guest-btn" class="secondary" data-i18n="btn_guest">…</button>
   </div>
 </div>
@@ -66,6 +51,7 @@
     </span>
     <span class="topbar-actions">
       <button id="sfx-toggle" class="link-btn">🔊</button>
+      <button id="sync-btn" class="link-btn hidden" data-i18n="btn_sync">…</button>
       <button id="tutorial-btn" class="link-btn" data-i18n="tut_button">…</button>
       <button id="leaderboard-btn" class="link-btn" data-i18n="nav_leaderboard">…</button>
       <button id="logout-btn" class="link-btn" data-i18n="nav_logout">…</button>
@@ -140,8 +126,8 @@
   </div>
 </div>
 
-<script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/auth.js"></script>
+<script src="js/languages.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/sfx.js"></script>

@@ -73,13 +73,22 @@ const Engine = (() => {
       CROSS_MAP.set(key, c.finding);
     }
 
-    const en = await fetchJson(dataBase + "/dil/en.json");
-    const tr = await fetchJson(dataBase + "/dil/tr.json");
+    const registry = (typeof window !== "undefined" && window.LANGUAGE_META) || [
+      { code: "en" }, { code: "tr" },
+    ];
+    const results = await Promise.allSettled(
+      registry.map((entry) => fetchJson(dataBase + "/dil/" + entry.code + ".json"))
+    );
     LANGS = {};
-    for (const data of [en, tr]) {
-      const code = (data.meta && data.meta.code) || (data === en ? "en" : "tr");
-      LANGS[code] = data;
-    }
+    results.forEach((res, i) => {
+      if (res.status === "fulfilled") {
+        const data = res.value;
+        const code = (data.meta && data.meta.code) || registry[i].code;
+        LANGS[code] = data;
+      } else {
+        console.warn("Failed to load language data for", registry[i].code, res.reason);
+      }
+    });
     BASE_LANG = LANGS.en ? "en" : Object.keys(LANGS).sort()[0];
 
     COMMANDS = {};
@@ -782,7 +791,7 @@ const Engine = (() => {
     if (verb === null) {
       return { lines: [{ text: T("ui", "unknown").replace("{x}", parts[0]), cls: "amber" }] };
     }
-    // save/load/quit are handled by the host page (localStorage / Firebase / navigation)
+    // save/load/quit are handled by the host page (localStorage / GitHub sync / navigation)
     if (["save", "load", "quit"].includes(verb)) {
       return { lines: [], hostVerb: verb };
     }
