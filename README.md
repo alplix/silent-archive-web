@@ -1,22 +1,10 @@
-# Sessiz Arşiv / The Silent Archive — Web
-
-Tarayıcıda oynanan, hesap sistemi, seviye/rütbe ilerlemesi, liderlik
-tablosu ve "kaldığın yerden devam et" özellikli web sürümü. Oyunun
-kendisi ve tüm içerik (565 kayıt, 303 bulgu, iki dil) orijinal Python/
-terminal sürümüyle birebir aynıdır — bu depo yalnızca aynı motoru ve
-aynı veri dosyalarını tarayıcıda çalışacak şekilde yeniden yazar.
+# The Silent Archive — Web
 
 Browser-playable version of the terminal SCP investigation game, with
 accounts, rank/XP progression, a leaderboard, and resume-where-you-left-off
-saves. The game and all content (565 records, 303 findings, two languages)
-are identical to the original Python/terminal version — this repo just
-re-implements the same engine to run client-side, reading the same data
-files unchanged.
-
-**Bu tamamen statik bir site.** Sunucu tarafı kod yok, SQL yok. Hesaplar,
-kayıtlı ilerleme ve liderlik tablosu için ücretsiz bir Firebase projesi
-kullanılıyor (NoSQL, Google'ın barındırdığı bir servis — siz bir sunucu
-çalıştırmuyorsunuz). Site GitHub Pages'te statik dosyalar olarak durur.
+saves. The game and all content (565 records, 303 findings) are identical
+to the original Python/terminal version — this repo just re-implements the
+same engine to run client-side, reading the same data files unchanged.
 
 **This is a fully static site.** No server-side code, no SQL. Accounts,
 saved progress and the leaderboard use a free Firebase project (NoSQL,
@@ -25,49 +13,26 @@ GitHub Pages as plain static files.
 
 ---
 
-## Canlı site / Live site
+## Live site
 
 **https://alplix.github.io/silent-archive-web/**
-
-Firebase kurulumu tamamlanana kadar oyun **giriş yapılmadan (misafir
-modu) yerel kayıtla** oynanabilir durumda; hesap/liderlik özellikleri
-`js/firebase-config.js` doldurulunca aktif olur.
 
 Until Firebase is configured, the game is fully playable in **guest mode**
 (local browser save only); accounts/leaderboard activate once
 `js/firebase-config.js` is filled in.
 
-## Yerelde çalıştırma / Run locally
+## Run locally
 
-Veri dosyaları `fetch()` ile yüklendiği için `index.html`'i doğrudan
-`file://` olarak açmak çalışmaz — herhangi bir statik dosya sunucusu
-yeterli:
+Data files are loaded via `fetch()`, so opening `index.html` directly as
+`file://` won't work — any static file server is enough:
 
 ```bash
 cd silent-archive-web
 python3 -m http.server 8000
-# http://localhost:8000 adresini açın
+# open http://localhost:8000
 ```
 
-## Firebase kurulumu (hesap / liderlik / bulut kayıt için) — zorunlu değil ama önerilir
-
-1. https://console.firebase.google.com/ adresinde ücretsiz bir proje
-   oluşturun.
-2. **Build > Authentication > Sign-in method**'da "Email/Password"
-   sağlayıcısını (ve isterseniz "Google"ı) etkinleştirin.
-3. **Build > Firestore Database > Create database**'i "production mode"
-   ile oluşturun (kurallar aşağıda verilecek).
-4. **Project settings > General > Your apps**'ten bir Web uygulaması
-   (`</>`) kaydedin, verdiği `firebaseConfig` nesnesini kopyalayın.
-5. Bu değerleri `js/firebase-config.js` dosyasına yapıştırın (bu
-   değerler gizli değildir, istemci tarafı koddadır — güvenlik
-   Firestore Kuralları ile sağlanır, aşağıya bakın).
-6. **Firestore Database > Rules**'a bu depodaki `firestore.rules`
-   dosyasının içeriğini yapıştırıp "Publish" deyin.
-7. Değişiklikleri commit'leyip GitHub'a push edin (veya GitHub Pages
-   otomatik olarak yeni `main` push'unu yayınlar).
-
-## Setup steps (English)
+## Firebase setup (for accounts / leaderboard / cloud save) — optional but recommended
 
 1. Create a free project at https://console.firebase.google.com/.
 2. Enable "Email/Password" (and optionally "Google") under
@@ -84,87 +49,63 @@ python3 -m http.server 8000
 
 ## GitHub Pages
 
-Repo ayarlarında **Settings > Pages > Build and deployment > Source:
-Deploy from a branch**, branch: `main`, folder: `/ (root)` seçili
-olmalı. Bu depo doğrudan kök dizinden statik olarak sunulacak şekilde
-hazırlandı.
-
 In repo settings: **Settings > Pages > Build and deployment > Source:
 Deploy from a branch**, branch `main`, folder `/ (root)`. This repo is
 laid out to be served as-is from the repository root.
 
-## Mimari / Architecture
+## Architecture
 
 ```
-index.html          giriş/dil/oyun ekranları — auth, language, game screens
-style.css            terminal görünümü — terminal look and feel
-js/engine.js          scp.py'nin birebir JS portu; manifest.json + dil/*.json'ı
-                       değiştirmeden okur — a faithful JS port of scp.py;
-                       reads manifest.json + dil/*.json unchanged
-js/firebase-config.js Firebase proje ayarları (siz doldurursunuz)
-                       your Firebase project config (you fill this in)
-js/auth.js             hesap, bulut kayıt, liderlik — Firebase Auth/Firestore
-                        wrapper: accounts, cloud save, leaderboard
-js/main.js              ekranları birbirine bağlar, terminali render eder
-                         wires screens together, renders the terminal
-data/manifest.json      orijinal Python projesinden değiştirilmeden kopyalandı
-data/dil/en.json        unchanged copies from the original Python project
+index.html             auth, language, game screens
+style.css               terminal look and feel
+js/languages.js          registry of available languages (add a language here)
+js/engine.js             a faithful JS port of scp.py;
+                         reads manifest.json + dil/*.json unchanged
+js/firebase-config.js   your Firebase project config (you fill this in)
+js/auth.js               Firebase Auth/Firestore wrapper: accounts, cloud
+                         save, leaderboard
+js/i18n.js                site-chrome localization (auth form, topbar,
+                         leaderboard, tutorial, toasts)
+js/sfx.js                  synthesized sound effects (Web Audio API)
+js/main.js                 wires screens together, renders the terminal
+data/manifest.json       unchanged copy from the original Python project
+data/dil/en.json          unchanged copies from the original Python project
 data/dil/tr.json
-firestore.rules         Firebase Console > Firestore > Rules'a yapıştırın
-                         paste into Firebase Console > Firestore > Rules
+data/dil/es.json
+firestore.rules          paste into Firebase Console > Firestore > Rules
 ```
 
-## Özellikler / Features
+## Features
 
-- **Kenar çubuğu**: her an görünen bir durum paneli (yetki, gün,
-  bulgu sayısı, kontaminasyon ve XP barları), ve tıklanabilir bir
-  kayıt listesi — bir kaydı okumak için tıklayın, iki okunmuş kaydı
-  onay kutularıyla seçip "Karşılaştır"a basarak çapraz referans
-  yapın; komut yazmak hâlâ çalışır, sadece artık zorunlu değil. /
-  **Sidebar**: an always-visible status panel (clearance, day,
-  findings count, contamination and XP bars), and a clickable record
-  list — click to read a record, check two you've read and hit
-  "Compare" to cross-reference them; typing commands still works,
-  it's just no longer required.
-- **Ses efektleri**: yeni bulgu, rütbe atlama, yüksek kontaminasyon
-  ve son gibi anlarda kısa, sentezlenmiş sesler (Web Audio API,
-  harici ses dosyası yok); üst çubuktaki 🔊 ile kapatılabilir. /
-  **Sound effects**: short synthesized cues (Web Audio API, no audio
-  files) for new findings, rank-ups, high contamination and endings;
-  toggle off with the 🔊 button in the topbar.
-- **Dil seçimi giriş ekranının üstünde** (sağ üstte sabit TR/EN
-  düğmesi) — seçilen dil giriş formunu, üst çubuğu, liderlik
-  tablosunu ve arşiv içeriğinin tamamını kapsar, oyun içinde de
-  `dil en`/`dil tr` ile değiştirilebilir. / **Language switcher sits
-  above/at the login screen** (fixed TR/EN toggle, top right) —
-  covers the login form, topbar, leaderboard and all archive content;
-  can also be changed mid-game with `lang en`/`lang tr`.
-- **Daktilo efekti**: kayıt/bulgu/posta metinleri, gün anlatıları ve
-  sonlar karakter karakter değil ama akan bir "yazılıyor" efektiyle
-  beliriyor (orijinal terminaldeki `slow()` çağrılarının web portu);
-  terminale tıklamak o an yazılan satırı anında tamamlar. /
-  **Typewriter effect**: record/finding/mail text, day narratives and
+- **Sidebar**: an always-visible status panel (clearance, day, findings
+  count, contamination and XP bars), and a clickable, searchable record
+  browser with separate Records/Findings tabs — click to read a record,
+  check two you've read and hit "Compare" to cross-reference them; typing
+  commands still works, it's just no longer required.
+- **Sound effects and toasts**: short synthesized cues (Web Audio API, no
+  audio files) plus animated toast notifications for new findings,
+  rank-ups, and rising/critical contamination — toggle sound off with the
+  🔊 button in the topbar. A contamination "tension vignette" overlay adds
+  visual pressure as the day and contamination meters climb.
+- **Language switcher sits above/at the login screen** (top-right dropdown)
+  — the selected language covers the login form, topbar, leaderboard and
+  all archive content; can also be changed mid-game with `lang <code>`.
+  Adding a language is a matter of dropping a new `data/dil/<code>.json`
+  file and registering it in `js/languages.js` — see that file's comment
+  for the full checklist.
+- **Typewriter effect**: record/finding/mail text, day narratives and
   endings reveal with a flowing "typing" animation (a web port of the
   original terminal's `slow()` calls); clicking the terminal instantly
   finishes the line currently animating.
-- **"Nasıl oynanır" öğretici** — ilk oyuna girişte otomatik açılan,
-  nesne sınıflarını, yetki seviyelerini, kontaminasyonu, bulgu/çapraz
-  referans mekaniğini ve 11 günlük süreyi anlatan bir bilgi kutusu;
-  üst çubuktaki düğmeyle istediğiniz an tekrar açılabilir. / **"How to
-  play" onboarding** — auto-shown on first game start, explaining
-  object classes, clearance levels, contamination, the
+- **"How to play" onboarding** — auto-shown on first game start, explaining
+  the goal, object classes, clearance levels, contamination, the
   finding/cross-reference mechanic and the 11-day clock; reopenable
   anytime from the topbar button.
-- Misafir modunda (giriş yapılmadan) ilerleme yalnızca o tarayıcıda
-  `localStorage` ile saklanır, cihazlar arası senkron olmaz ve
-  liderlik tablosuna girmez. / In guest mode (no login), progress is
-  saved only to that browser's `localStorage` — no cross-device sync,
-  not included in the leaderboard.
+- In guest mode (no login), progress is saved only to that browser's
+  `localStorage` — no cross-device sync, not included in the leaderboard.
 
-## Lisans / License
+## License
 
-SCP Vakfı kavramları [SCP Wiki](https://scpwiki.com)'ye aittir, CC
-BY-SA 3.0 ile lisanslanmıştır. Bu oyundaki tüm metinler özgündür ve
-aynı lisansla paylaşılmaktadır. / SCP Foundation concepts belong to the
-collaborative [SCP Wiki](https://scpwiki.com), licensed CC BY-SA 3.0.
-All prose in this game is original and shared under the same licence.
+SCP Foundation concepts belong to the collaborative
+[SCP Wiki](https://scpwiki.com), licensed CC BY-SA 3.0. All prose in this
+game is original and shared under the same licence.
