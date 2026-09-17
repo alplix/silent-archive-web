@@ -43,6 +43,7 @@ const UI_STRINGS = {
     tut_button: "Nasıl oynanır",
     tut_close: "Anladım, başla",
     tut_items: [
+      { h: "Amacınız Ne?", b: "Bir arşiv denetçisisiniz. Görev: kayıtları okuyun ('liste' ile listeyi görün, 'oku SCP-173' gibi okuyun), aralarındaki çelişkileri bulmak için ikişer ikişer karşılaştırın ('capraz SCP-173 SCP-096'), bu size bir bulgu kazandırır. Yeterince bulgu topladıktan sonra 'rapor' yazıp bir son seçin. Hepsi bu kadar — okuyun, karşılaştırın, biriktirin, kapatın." },
       { h: "Nesne Sınıfı", b: "Safe: düşük risk. Euclid: davranışı tam anlaşılmamış, dikkat gerektirir. Keter: yüksek risk, sıkı kontrol önlemleri gerekir. Thaumiel: Vakfın başka anomalilere karşı bir araç olarak kullandığı anomaliler." },
       { h: "Yetki Seviyesi", b: "Kayıtlar Seviye 2-6 arasında kilitlidir. Bazı bölümler yetkiniz yetene kadar [REDAKTE] görünür. Belgelerin içinde saklı anahtarları bulup 'kod <anahtar>' yazarak yetkinizi yükseltirsiniz." },
       { h: "Bilişsel Kontaminasyon", b: "Okudukça artar. %100'e ulaşırsa denetim sizin için biter. 'dinlen' bir günü bitirip düşürür; SCP-999 dosyasını okumak ve amnezik kullanmak da düşürür." },
@@ -88,6 +89,7 @@ const UI_STRINGS = {
     tut_button: "How to play",
     tut_close: "Got it, start",
     tut_items: [
+      { h: "What's the goal?", b: "You're an archive auditor. Your job: read records ('list' to see them, 'read SCP-173' to open one), compare them two at a time to find contradictions ('cross SCP-173 SCP-096') — that earns you a finding. Once you've collected enough findings, type 'report' and pick an ending. That's the whole loop: read, compare, collect, close the case." },
       { h: "Object Class", b: "Safe: low risk. Euclid: behavior not fully understood, requires caution. Keter: high risk, demands strict containment. Thaumiel: anomalies the Foundation actively uses as a tool against other anomalies." },
       { h: "Clearance Level", b: "Records are locked to Level 2-6. Some sections show [REDACTED] until your clearance is high enough. Keys are hidden inside the documents themselves — find one and type 'code <key>' to raise your clearance." },
       { h: "Cognitive Contamination", b: "Rises as you read. At 100% the audit ends for you. 'rest' ends a day and lowers it; reading the SCP-999 file and using an amnestic also lower it." },
