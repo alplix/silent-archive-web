@@ -27,7 +27,7 @@ GitHub Pages as plain static files.
 
 ## Canlı site / Live site
 
-**https://alplix.github.io/sessiz-arsiv-web/**
+**https://alplix.github.io/silent-archive-web/**
 
 Firebase kurulumu tamamlanana kadar oyun **giriş yapılmadan (misafir
 modu) yerel kayıtla** oynanabilir durumda; hesap/liderlik özellikleri
@@ -44,7 +44,7 @@ Veri dosyaları `fetch()` ile yüklendiği için `index.html`'i doğrudan
 yeterli:
 
 ```bash
-cd sessiz-arsiv-web
+cd silent-archive-web
 python3 -m http.server 8000
 # http://localhost:8000 adresini açın
 ```
