@@ -114,12 +114,31 @@ firestore.rules         Firebase Console > Firestore > Rules'a yapıştırın
                          paste into Firebase Console > Firestore > Rules
 ```
 
-## Bilinen basitleştirmeler / Known simplifications
+## Özellikler / Features
 
-- Orijinal terminaldeki karakter karakter "daktilo" yazım efekti bu
-  sürümde yok; metinler anında yazdırılıyor. / The original terminal's
-  character-by-character typewriter effect is not implemented here;
-  text prints instantly.
+- **Dil seçimi giriş ekranının üstünde** (sağ üstte sabit TR/EN
+  düğmesi) — seçilen dil giriş formunu, üst çubuğu, liderlik
+  tablosunu ve arşiv içeriğinin tamamını kapsar, oyun içinde de
+  `dil en`/`dil tr` ile değiştirilebilir. / **Language switcher sits
+  above/at the login screen** (fixed TR/EN toggle, top right) —
+  covers the login form, topbar, leaderboard and all archive content;
+  can also be changed mid-game with `lang en`/`lang tr`.
+- **Daktilo efekti**: kayıt/bulgu/posta metinleri, gün anlatıları ve
+  sonlar karakter karakter değil ama akan bir "yazılıyor" efektiyle
+  beliriyor (orijinal terminaldeki `slow()` çağrılarının web portu);
+  terminale tıklamak o an yazılan satırı anında tamamlar. /
+  **Typewriter effect**: record/finding/mail text, day narratives and
+  endings reveal with a flowing "typing" animation (a web port of the
+  original terminal's `slow()` calls); clicking the terminal instantly
+  finishes the line currently animating.
+- **"Nasıl oynanır" öğretici** — ilk oyuna girişte otomatik açılan,
+  nesne sınıflarını, yetki seviyelerini, kontaminasyonu, bulgu/çapraz
+  referans mekaniğini ve 11 günlük süreyi anlatan bir bilgi kutusu;
+  üst çubuktaki düğmeyle istediğiniz an tekrar açılabilir. / **"How to
+  play" onboarding** — auto-shown on first game start, explaining
+  object classes, clearance levels, contamination, the
+  finding/cross-reference mechanic and the 11-day clock; reopenable
+  anytime from the topbar button.
 - Misafir modunda (giriş yapılmadan) ilerleme yalnızca o tarayıcıda
   `localStorage` ile saklanır, cihazlar arası senkron olmaz ve
   liderlik tablosuna girmez. / In guest mode (no login), progress is

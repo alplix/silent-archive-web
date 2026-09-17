@@ -24,6 +24,34 @@ html, body {
 
 .hidden { display: none !important; }
 
+.lang-switch {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.lang-switch .lang-sep { color: var(--darkgreen); }
+.lang-opt {
+  background: none;
+  border: none;
+  color: var(--darkgreen);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.lang-opt.active { color: var(--green); text-decoration: underline; }
+.lang-opt:hover { color: var(--green); }
+
 .screen {
   min-height: 100vh;
   display: flex;
@@ -213,7 +241,20 @@ html, body {
   border-bottom: 1px solid #123a1a;
 }
 #leaderboard-table th { color: var(--darkgreen); font-weight: normal; }
-#leaderboard-close {
+#tutorial-body { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 4px 0; }
+#tutorial-body .tut-item h3 {
+  margin: 0 0 3px 0;
+  font-size: 13px;
+  color: var(--cyan);
+}
+#tutorial-body .tut-item p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--green);
+}
+
+#tutorial-close, #leaderboard-close {
   margin-top: 16px;
   background: var(--darkgreen);
   color: #041004;

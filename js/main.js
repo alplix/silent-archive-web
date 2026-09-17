@@ -2,7 +2,7 @@ import * as Auth from "./auth.js";
 
 const $ = (sel) => document.querySelector(sel);
 const screens = {
-  boot: $("#boot-screen"), auth: $("#auth-screen"), lang: $("#lang-screen"), game: $("#game-screen"),
+  boot: $("#boot-screen"), auth: $("#auth-screen"), game: $("#game-screen"),
 };
 
 function showScreen(name) {
@@ -13,11 +13,37 @@ function showScreen(name) {
 const LOCAL_SAVE_KEY = "sessiz-arsiv-save-v1";
 
 let currentUser = null;   // Firebase user, or null for local/guest play
+let inGame = false;
 let awaitingConfirm = null;
 let awaitingReportChoice = null;
 let gameOver = false;
 const history = [];
 let historyIdx = -1;
+
+// ---------------------------------------------------------------------------
+// language switcher — visible on every screen, drives both the static site
+// chrome (I18N) and, once in game, the archive content language (Engine).
+// ---------------------------------------------------------------------------
+
+function wireLangSwitch() {
+  window.I18N.setUiLang(window.I18N.getUiLang()); // paint + mark active button
+  document.querySelectorAll(".lang-opt").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const code = btn.dataset.lang;
+      window.I18N.setUiLang(code);
+      updateTopbarText();
+      if (inGame) {
+        const E = window.Engine;
+        const state = E.getState();
+        if (state.lang !== code && E.LANGS[code]) {
+          state.lang = code;
+          updatePromptTag();
+          persist();
+        }
+      }
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // boot
@@ -28,7 +54,7 @@ async function boot() {
     await window.Engine.boot("data");
   } catch (err) {
     document.querySelector("#boot-screen p").textContent =
-      "Veri yüklenemedi / Failed to load game data: " + err.message;
+      "Failed to load game data: " + err.message;
     return;
   }
 
@@ -39,8 +65,7 @@ async function boot() {
     if (unsub) unsub();
     if (user) {
       currentUser = user;
-      showScreen("lang");
-      buildLangButtons();
+      startGame(window.I18N.getUiLang());
     } else {
       showScreen("auth");
       wireAuthScreen();
@@ -68,8 +93,7 @@ function wireAuthScreen() {
     $("#login-err").textContent = "";
     try {
       currentUser = await Auth.loginWithEmail($("#login-email").value, $("#login-password").value);
-      showScreen("lang");
-      buildLangButtons();
+      startGame(window.I18N.getUiLang());
     } catch (err) {
       $("#login-err").textContent = friendlyAuthError(err);
     }
@@ -80,12 +104,11 @@ function wireAuthScreen() {
     $("#register-err").textContent = "";
     try {
       currentUser = await Auth.registerWithEmail(
-        $("#register-name").value.trim() || "Denetçi",
+        $("#register-name").value.trim() || window.I18N.t("operator_label"),
         $("#register-email").value,
         $("#register-password").value,
       );
-      showScreen("lang");
-      buildLangButtons();
+      startGame(window.I18N.getUiLang());
     } catch (err) {
       $("#register-err").textContent = friendlyAuthError(err);
     }
@@ -94,8 +117,7 @@ function wireAuthScreen() {
   $("#google-btn").addEventListener("click", async () => {
     try {
       currentUser = await Auth.loginWithGoogle();
-      showScreen("lang");
-      buildLangButtons();
+      startGame(window.I18N.getUiLang());
     } catch (err) {
       $("#login-err").textContent = friendlyAuthError(err);
     }
@@ -103,36 +125,19 @@ function wireAuthScreen() {
 
   $("#guest-btn").addEventListener("click", () => {
     currentUser = null; // pure local/guest mode, no Firebase involved
-    showScreen("lang");
-    buildLangButtons();
+    startGame(window.I18N.getUiLang());
   });
 }
 
 function friendlyAuthError(err) {
-  const msg = String(err && err.message || err);
-  if (msg.includes("Firebase henüz") || msg.includes("not configured")) return msg;
-  if (msg.includes("auth/email-already-in-use")) return "Bu e-posta zaten kayıtlı / Email already registered.";
-  if (msg.includes("auth/invalid-credential") || msg.includes("auth/wrong-password")) return "Hatalı e-posta veya şifre / Wrong email or password.";
-  if (msg.includes("auth/weak-password")) return "Şifre en az 6 karakter olmalı / Password must be at least 6 characters.";
-  if (msg.includes("auth/user-not-found")) return "Hesap bulunamadı / Account not found.";
+  const msg = String((err && err.message) || err);
+  const t = window.I18N.t;
+  if (msg.includes("Firebase henüz") || msg.includes("not configured")) return t("err_not_configured");
+  if (msg.includes("auth/email-already-in-use")) return t("err_email_in_use");
+  if (msg.includes("auth/invalid-credential") || msg.includes("auth/wrong-password")) return t("err_wrong_credentials");
+  if (msg.includes("auth/weak-password")) return t("err_weak_password");
+  if (msg.includes("auth/user-not-found")) return t("err_user_not_found");
   return msg;
-}
-
-// ---------------------------------------------------------------------------
-// language screen
-// ---------------------------------------------------------------------------
-
-function buildLangButtons() {
-  const box = $("#lang-buttons");
-  box.innerHTML = "";
-  const langs = window.Engine.LANGS;
-  for (const code of Object.keys(langs).sort()) {
-    const meta = langs[code].meta || {};
-    const btn = document.createElement("button");
-    btn.textContent = `${code.toUpperCase()} — ${meta.name || code}`;
-    btn.addEventListener("click", () => startGame(code));
-    box.appendChild(btn);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +147,7 @@ function buildLangButtons() {
 async function startGame(langCode) {
   gameOver = false;
   const E = window.Engine;
+  if (!E.LANGS[langCode]) langCode = E.BASE_LANG;
 
   let state = null;
   if (currentUser && Auth.isConfigured()) {
@@ -160,20 +166,71 @@ async function startGame(langCode) {
   state.lang = langCode;
   E.setState(state);
 
+  inGame = true;
   showScreen("game");
   $("#terminal").innerHTML = "";
-  $("#topbar-user").textContent = currentUser
-    ? `Denetçi: ${Auth.displayNameFor(currentUser)}`
-    : "Misafir modu / Guest mode (kaydedilir yalnızca bu tarayıcıda)";
+  updateTopbarText();
 
   printIntro();
   updatePromptTag();
   wireInput();
   $("#cmd-input").focus();
+
+  maybeShowTutorial();
 }
 
-function printIntro() {
+// ---------------------------------------------------------------------------
+// onboarding tutorial (object classes, clearance, contamination, findings...)
+// ---------------------------------------------------------------------------
+
+const TUTORIAL_SEEN_KEY = "silent-archive-tutorial-seen";
+
+function buildTutorialContent() {
+  const box = $("#tutorial-body");
+  box.innerHTML = "";
+  for (const item of window.I18N.t("tut_items")) {
+    const div = document.createElement("div");
+    div.className = "tut-item";
+    const h3 = document.createElement("h3");
+    h3.textContent = item.h;
+    const p = document.createElement("p");
+    p.textContent = item.b;
+    div.appendChild(h3);
+    div.appendChild(p);
+    box.appendChild(div);
+  }
+}
+
+function openTutorial() {
+  buildTutorialContent();
+  $("#tutorial-modal").classList.remove("hidden");
+}
+
+function closeTutorial() {
+  $("#tutorial-modal").classList.add("hidden");
+  try { localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch { /* ignore */ }
+  $("#cmd-input").focus();
+}
+
+function maybeShowTutorial() {
+  let seen = false;
+  try { seen = localStorage.getItem(TUTORIAL_SEEN_KEY) === "1"; } catch { /* ignore */ }
+  if (!seen) openTutorial();
+}
+
+$("#tutorial-btn").addEventListener("click", openTutorial);
+$("#tutorial-close").addEventListener("click", closeTutorial);
+
+function updateTopbarText() {
+  if (!inGame) return;
+  $("#topbar-user").textContent = currentUser
+    ? `${window.I18N.t("operator_label")}: ${Auth.displayNameFor(currentUser)}`
+    : window.I18N.t("guest_mode");
+}
+
+async function printIntro() {
   const E = window.Engine;
+  const fast = E.getState().fast;
   const logo = document.createElement("pre");
   logo.className = "line darkgreen";
   logo.textContent = "   ___  ___ _ ___  _  _ ___ _____\n  / __|/ __(_) _ \\| \\| | __|_   _|\n  \\__ \\ (__| |  _/| .` | _|  | |\n  |___/\\___|_|_|  |_|\\_|___| |_|";
@@ -182,11 +239,14 @@ function printIntro() {
   printLine("=".repeat(72), "darkgreen");
   printLine("");
   const introLines = E.T("intro", { default: [] });
-  for (const l of introLines) printLine(l, "green");
+  for (const l of introLines) {
+    if (fast) printLine(l, "green"); else await typeLine(l, "green", 9);
+  }
   printLine("");
   printLine("=".repeat(72), "darkgreen");
   printLine("  " + E.T("acts", "1", "title"), "bold cyan");
-  printLine(E.T("acts", "1", "blurb", { default: "" }), "green");
+  const blurb = E.T("acts", "1", "blurb", { default: "" });
+  if (fast) printLine(blurb, "green"); else await typeLine(blurb, "green", 9);
   printLine("=".repeat(72), "darkgreen");
   printLine(E.T("ui", "intro_hint"), "cyan");
   printLine("=".repeat(72), "darkgreen");
@@ -201,8 +261,48 @@ function printLine(text, cls = "") {
   $("#terminal").appendChild(div);
 }
 
-function printLines(lines) {
-  for (const l of lines) printLine(l.text, l.cls);
+// Typewriter reveal for atmospheric lines (record/finding/mail bodies, day
+// narratives, endings, rank-ups). Long text reveals in small chunks (not
+// strictly one character at a time) so a 700-word record finishes in a few
+// seconds rather than a minute. Click anywhere in the terminal to instantly
+// finish the line currently animating.
+let skipRequested = false;
+$("#terminal").addEventListener("click", () => {
+  skipRequested = true;
+  $("#cmd-input").focus();
+});
+
+function typeLine(text, cls, speedHint) {
+  return new Promise((resolve) => {
+    const div = document.createElement("div");
+    div.className = "line " + cls;
+    $("#terminal").appendChild(div);
+    if (!text) { resolve(); return; }
+    skipRequested = false;
+    const interval = speedHint || 12;
+    const chunk = text.length <= 90 ? 1 : Math.max(1, Math.round(text.length / 150));
+    let i = 0;
+    function step() {
+      if (skipRequested) { div.textContent = text; scrollDown(); resolve(); return; }
+      i = Math.min(text.length, i + chunk);
+      div.textContent = text.slice(0, i);
+      scrollDown();
+      if (i >= text.length) { resolve(); return; }
+      setTimeout(step, interval);
+    }
+    step();
+  });
+}
+
+async function printLines(lines) {
+  const fast = window.Engine.getState().fast;
+  for (const l of lines) {
+    if (l.anim && !fast) {
+      await typeLine(l.text, l.cls, l.animSpeed);
+    } else {
+      printLine(l.text, l.cls);
+    }
+  }
   scrollDown();
 }
 
@@ -248,7 +348,7 @@ async function handleLine(raw) {
     const fn = awaitingConfirm;
     awaitingConfirm = null;
     const res = fn(E.isYes(raw));
-    printLines(res.lines);
+    await printLines(res.lines);
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
     persist();
@@ -258,7 +358,7 @@ async function handleLine(raw) {
     const fn = awaitingReportChoice;
     awaitingReportChoice = null;
     const res = fn(raw.trim());
-    printLines(res.lines);
+    await printLines(res.lines);
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
     persist();
@@ -290,17 +390,18 @@ async function handleLine(raw) {
     printLine(E.T("ui", "bye"), "dim darkgreen");
     await persist(true);
     gameOver = true;
+    inGame = false;
     $("#cmd-input").disabled = true;
-    setTimeout(() => { showScreen("lang"); }, 900);
+    setTimeout(() => { showScreen("auth"); wireAuthScreen(); }, 900);
     return;
   }
 
   if (result.clearScreen) {
     $("#terminal").innerHTML = "";
-    printIntro();
+    await printIntro();
   }
 
-  printLines(result.lines);
+  await printLines(result.lines);
 
   if (result.pendingConfirm) awaitingConfirm = result.pendingConfirm;
   if (result.pendingReportChoice) awaitingReportChoice = result.pendingReportChoice;
@@ -316,8 +417,8 @@ function handleEnding(ended) {
   $("#cmd-input").disabled = true;
   clearSave();
   printLine("");
-  printLine(">> oturum sona erdi — yeniden başlamak için sayfayı yenileyin", "dim amber");
-  printLine(">> session ended — refresh the page to start a new run", "dim amber");
+  printLine(window.I18N.t("session_ended_1"), "dim amber");
+  printLine(window.I18N.t("session_ended_2"), "dim amber");
 }
 
 // ---------------------------------------------------------------------------
@@ -384,12 +485,13 @@ async function reloadSave() {
 // ---------------------------------------------------------------------------
 
 async function openLeaderboard() {
+  const t = window.I18N.t;
   const modal = $("#leaderboard-modal");
   modal.classList.remove("hidden");
   const tbody = document.querySelector("#leaderboard-table tbody");
-  tbody.innerHTML = "<tr><td colspan='5'>...</td></tr>";
+  tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_loading"))}</td></tr>`;
   if (!Auth.isConfigured()) {
-    tbody.innerHTML = "<tr><td colspan='5'>Firebase yapılandırılmadı / Firebase not configured — leaderboard needs the site owner to set up js/firebase-config.js.</td></tr>";
+    tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_not_configured"))}</td></tr>`;
     return;
   }
   try {
@@ -400,9 +502,9 @@ async function openLeaderboard() {
       tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.displayName || "?")}</td><td>${escapeHtml(r.rank || "")}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
       tbody.appendChild(tr);
     });
-    if (!rows.length) tbody.innerHTML = "<tr><td colspan='5'>Henüz kimse yok / Nobody yet.</td></tr>";
+    if (!rows.length) tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_empty"))}</td></tr>`;
   } catch (err) {
-    tbody.innerHTML = "<tr><td colspan='5'>Yüklenemedi / Failed to load: " + escapeHtml(err.message) + "</td></tr>";
+    tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_error"))}${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -419,4 +521,5 @@ $("#logout-btn").addEventListener("click", async () => {
   location.reload();
 });
 
+wireLangSwitch();
 boot();

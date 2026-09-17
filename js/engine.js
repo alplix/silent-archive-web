@@ -182,7 +182,7 @@ const Engine = (() => {
         STATE.thresholds_fired = STATE.thresholds_fired.filter(t => t <= STATE.contam);
       }
       lines.push({ text: "", cls: "" });
-      lines.push({ text: "  >> " + T("ui", "rank_up").replace("{rank}", rankName(idx)), cls: "cyan" });
+      lines.push({ text: "  >> " + T("ui", "rank_up").replace("{rank}", rankName(idx)), cls: "cyan", anim: true, animSpeed: 14 });
       if (relief && before > STATE.contam) {
         lines.push({ text: T("ui", "rank_up_relief").replace("{n}", String(before - STATE.contam)), cls: "dim cyan" });
       }
@@ -369,7 +369,7 @@ const Engine = (() => {
     });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "", cls: "" });
-    lines.push({ text: body(T("records", rid, "text")), cls: "green" });
+    lines.push({ text: body(T("records", rid, "text")), cls: "green", anim: true });
     lines.push({ text: "", cls: "" });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
 
@@ -447,11 +447,11 @@ const Engine = (() => {
 
     STATE.findings.push(fid);
     lines.push({ text: "", cls: "" });
-    lines.push({ text: "  >> " + T("ui", "cross_match"), cls: "cyan" });
+    lines.push({ text: "  >> " + T("ui", "cross_match"), cls: "cyan", anim: true, animSpeed: 14 });
     lines.push({ text: "", cls: "" });
     lines.push({ text: "  " + T("findings", fid, "title"), cls: "bold white" });
     lines.push({ text: "", cls: "" });
-    lines.push({ text: indentText(body(T("findings", fid, "text"))), cls: "green" });
+    lines.push({ text: indentText(body(T("findings", fid, "text"))), cls: "green", anim: true });
     lines.push({ text: "", cls: "" });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     addContam(RULES.contam_per_cross, lines);
@@ -502,7 +502,7 @@ const Engine = (() => {
       lines.push({ text: "  " + T("ui", "mail_subject") + ": " + T("mail", mid, "subject"), cls: "white" });
       lines.push({ text: "=".repeat(72), cls: "darkgreen" });
       lines.push({ text: "", cls: "" });
-      lines.push({ text: body(T("mail", mid, "text")), cls: "green" });
+      lines.push({ text: body(T("mail", mid, "text")), cls: "green", anim: true });
       lines.push({ text: "", cls: "" });
       lines.push({ text: "=".repeat(72), cls: "darkgreen" });
       return { lines };
@@ -570,7 +570,7 @@ const Engine = (() => {
         out.push({ text: "  " + T("ui", "day_header").replace("{n}", String(STATE.day)), cls: "bold white" });
         out.push({ text: "=".repeat(72), cls: "darkgreen" });
         out.push({ text: "", cls: "" });
-        out.push({ text: T("days", String(STATE.day), { default: T("ui", "day_generic") }), cls: "green" });
+        out.push({ text: T("days", String(STATE.day), { default: T("ui", "day_generic") }), cls: "green", anim: true });
         out.push({ text: "", cls: "" });
         out.push({ text: T("ui", "rest_done").replace("{n}", String(before - STATE.contam)), cls: "cyan" });
         addXp(RULES.xp_rest_bonus || 0, out);
@@ -592,7 +592,7 @@ const Engine = (() => {
     if (STATE.clearance >= lvl) { lines.push({ text: T("ui", "code_already").replace("{n}", String(lvl)), cls: "amber" }); return { lines }; }
     STATE.clearance = lvl;
     lines.push({ text: "", cls: "" });
-    lines.push({ text: T("ui", "code_ok").replace("{n}", String(lvl)), cls: "cyan" });
+    lines.push({ text: T("ui", "code_ok").replace("{n}", String(lvl)), cls: "cyan", anim: true, animSpeed: 15 });
     lines.push({ text: T("ui", "code_note"), cls: "dim darkgreen" });
     let act = 1;
     for (const m of Object.values(RECORDS)) if (m.clearance <= lvl) act = Math.max(act, m.act);
@@ -703,7 +703,7 @@ const Engine = (() => {
     lines.push({ text: "  " + T("ui", "report_title"), cls: "bold white" });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "", cls: "" });
-    lines.push({ text: body(T("report", "intro").replace("{n}", String(n)).replace("{t}", String(FINDING_ORDER.length))), cls: "green" });
+    lines.push({ text: body(T("report", "intro").replace("{n}", String(n)).replace("{t}", String(FINDING_ORDER.length))), cls: "green", anim: true });
     lines.push({ text: "", cls: "" });
     opts.forEach((eid, i) => {
       lines.push({ text: `  ${i + 1}) ${T("report", "options", eid, "label")}`, cls: "bold white" });
@@ -739,7 +739,7 @@ const Engine = (() => {
     lines.push({ text: "  " + T("endings", endingId, "title"), cls: "bold white" });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "", cls: "" });
-    for (const para of paras) { lines.push({ text: para, cls: "green" }); lines.push({ text: "", cls: "" }); }
+    for (const para of paras) { lines.push({ text: para, cls: "green", anim: true }); lines.push({ text: "", cls: "" }); }
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "  " + T("ui", "end_findings").replace("{n}", String(STATE.findings.length)).replace("{t}", String(FINDING_ORDER.length)), cls: "dim darkgreen" });
     lines.push({ text: "  " + T("ui", "end_contam").replace("{n}", String(STATE.contam)), cls: "dim darkgreen" });
@@ -755,7 +755,7 @@ const Engine = (() => {
     lines.push({ text: "  " + T("endings", endingId, "title"), cls: "bold red" });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "", cls: "" });
-    for (const para of T("endings", endingId, "full", { default: [] })) { lines.push({ text: para, cls: "red" }); lines.push({ text: "", cls: "" }); }
+    for (const para of T("endings", endingId, "full", { default: [] })) { lines.push({ text: para, cls: "red", anim: true }); lines.push({ text: "", cls: "" }); }
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
     lines.push({ text: "  " + T("ui", "end_findings").replace("{n}", String(STATE.findings.length)).replace("{t}", String(FINDING_ORDER.length)), cls: "dim darkgreen" });
     lines.push({ text: "  " + T("ui", "end_hint"), cls: "dim darkgreen" });
