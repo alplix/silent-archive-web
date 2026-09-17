@@ -36,12 +36,16 @@ function writeOutput(name, value) {
   fs.appendFileSync(file, `${name}<<EOF\n${safe}\nEOF\n`);
 }
 
-function rankNameFor(xp) {
-  let name = RANKS_META[0] ? RANKS_META[0].id : "stajyer";
+// Returns the rank's internal id (e.g. "stajyer"), not a display name —
+// this script has no access to dil/*.json's localized rank names, so the
+// client resolves the id to text via Engine.T("ranks", id) at render time,
+// which also means the leaderboard respects each viewer's language.
+function rankIdFor(xp) {
+  let id = RANKS_META[0] ? RANKS_META[0].id : "stajyer";
   for (const r of RANKS_META) {
-    if (xp >= r.at) name = r.id;
+    if (xp >= r.at) id = r.id;
   }
-  return name;
+  return id;
 }
 
 function main() {
@@ -112,7 +116,7 @@ function main() {
   leaderboard[username.toLowerCase()] = {
     username,
     xp,
-    rank: rankNameFor(xp),
+    rankId: rankIdFor(xp),
     findings: findings.length,
     clearance,
     updatedAt: cleanState.updatedAt,

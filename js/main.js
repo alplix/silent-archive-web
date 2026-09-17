@@ -761,10 +761,12 @@ async function openLeaderboard() {
   tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_loading"))}</td></tr>`;
   try {
     const rows = await Auth.fetchLeaderboard(50);
+    const E = window.Engine;
     tbody.innerHTML = "";
     rows.forEach((r, i) => {
+      const rankName = r.rankId ? E.T("ranks", r.rankId, { default: r.rankId }) : "";
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.username || "?")}</td><td>${escapeHtml(r.rank || "")}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
+      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.username || "?")}</td><td>${escapeHtml(rankName)}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
       tbody.appendChild(tr);
     });
     if (!rows.length) tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_empty"))}</td></tr>`;
