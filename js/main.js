@@ -182,7 +182,10 @@ async function startGame(langCode) {
 
   printIntro();
   updatePromptTag();
+  browserTab = "records";
+  browserSearch = "";
   renderDashboard();
+  wireBrowserTabsAndSearch();
   renderRecordBrowser();
   wireSidebar();
   wireInput();
@@ -203,11 +206,20 @@ function renderDashboard() {
   $("#stat-day").textContent = `${s.day} / ${E.RULES.days_max}`;
   $("#stat-findings").textContent = `${s.findings.length} / ${E.FINDING_ORDER.length}`;
 
+  const dayPct = Math.min(100, Math.round((s.day / E.RULES.days_max) * 100));
+  const dayMeter = $("#meter-day");
+  dayMeter.style.width = dayPct + "%";
+  dayMeter.className = "meter-fill day" + (s.day >= E.RULES.days_max - 2 ? " urgent" : "");
+
   const c = s.contam;
   $("#stat-contam-pct").textContent = `${c}%`;
   const contamMeter = $("#meter-contam");
   contamMeter.style.width = c + "%";
   contamMeter.className = "meter-fill" + (c >= 70 ? " danger" : c >= 40 ? " warn" : "");
+
+  const vignette = $("#tension-vignette");
+  vignette.classList.toggle("on", c >= 55);
+  vignette.classList.toggle("pulse", c >= 80);
 
   const idx = E.rankIndex(s.xp);
   $("#stat-rank").textContent = E.rankName(idx);
@@ -225,24 +237,26 @@ function renderDashboard() {
   }
 }
 
+let browserTab = "records";
+let browserSearch = "";
+
 function renderRecordBrowser() {
+  if (browserTab === "findings") { renderFindingsList(); return; }
+
   const E = window.Engine;
   const s = E.getState();
   const t = window.I18N.t;
   const box = $("#record-browser");
   box.innerHTML = "";
 
-  const header = document.createElement("div");
-  header.className = "rb-act-header";
-  header.style.marginTop = "0";
-  header.textContent = t("browser_title");
-  box.appendChild(header);
+  const needle = E.fold(browserSearch);
+  const accessible = E.RECORD_ORDER.filter((rid) => E.accessible(rid))
+    .filter((rid) => !needle || E.fold(E.T("records", rid, "name", { default: rid })).includes(needle));
 
-  const accessible = E.RECORD_ORDER.filter((rid) => E.accessible(rid));
   if (!accessible.length) {
     const p = document.createElement("div");
     p.className = "rb-tag";
-    p.textContent = t("browser_empty");
+    p.textContent = browserSearch ? t("browser_no_match") : t("browser_empty");
     box.appendChild(p);
     return;
   }
@@ -254,6 +268,7 @@ function renderRecordBrowser() {
       currentAct = meta.act;
       const h = document.createElement("div");
       h.className = "rb-act-header";
+      h.style.marginTop = currentAct === meta.act && box.children.length === 0 ? "0" : "";
       h.textContent = E.T("acts", String(currentAct), "title", { default: "ACT " + currentAct });
       box.appendChild(h);
     }
@@ -292,6 +307,73 @@ function renderRecordBrowser() {
     });
     box.appendChild(row);
   }
+}
+
+function renderFindingsList() {
+  const E = window.Engine;
+  const s = E.getState();
+  const t = window.I18N.t;
+  const box = $("#record-browser");
+  box.innerHTML = "";
+
+  const needle = E.fold(browserSearch);
+  const found = E.FINDING_ORDER.filter((fid) => s.findings.includes(fid))
+    .filter((fid) => !needle || E.fold(E.T("findings", fid, "title", { default: fid })).includes(needle));
+
+  if (!found.length) {
+    const p = document.createElement("div");
+    p.className = "rb-tag";
+    p.textContent = browserSearch ? t("browser_no_match") : t("findings_empty");
+    box.appendChild(p);
+    return;
+  }
+
+  for (const fid of found) {
+    const card = document.createElement("div");
+    card.className = "finding-card";
+    const title = document.createElement("div");
+    title.className = "fc-title";
+    title.textContent = E.T("findings", fid, "title", { default: fid });
+    const excerpt = document.createElement("div");
+    excerpt.className = "fc-excerpt";
+    const full = E.T("findings", fid, "text", { default: "" });
+    excerpt.textContent = full.length > 100 ? full.slice(0, 100) + "…" : full;
+    card.appendChild(title);
+    card.appendChild(excerpt);
+    card.addEventListener("click", () => {
+      window.SFX.open();
+      printLine("", "");
+      printLine("=".repeat(72), "darkgreen");
+      printLine("  " + title.textContent, "bold white");
+      printLine("", "");
+      printLine(full, "green");
+      printLine("=".repeat(72), "darkgreen");
+      scrollDown();
+    });
+    box.appendChild(card);
+  }
+}
+
+function wireBrowserTabsAndSearch() {
+  document.querySelectorAll("#browser-tabs .rb-tab").forEach((tab) => {
+    const clone = tab.cloneNode(true);
+    tab.replaceWith(clone);
+  });
+  document.querySelectorAll("#browser-tabs .rb-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#browser-tabs .rb-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      browserTab = tab.dataset.tab;
+      window.SFX.key();
+      renderRecordBrowser();
+    });
+  });
+  const search = freshEl("#rb-search");
+  search.value = browserSearch;
+  search.addEventListener("input", () => {
+    browserSearch = search.value;
+    renderRecordBrowser();
+  });
 }
 
 function toggleCrossPick(rid) {
@@ -539,12 +621,27 @@ function refreshSidebar() {
 function snapshot(s) {
   return { findingsCount: s.findings.length, rankSeen: s.rank_seen, contam: s.contam };
 }
+function showToast(text, cls = "") {
+  const stack = $("#toast-stack");
+  const el = document.createElement("div");
+  el.className = "toast" + (cls ? " " + cls : "");
+  el.textContent = text;
+  stack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 300);
+  }, 2400);
+}
+
 function playCueFor(before, s) {
+  const E = window.Engine;
+  const t = window.I18N.t;
   const after = snapshot(s);
-  if (after.findingsCount > before.findingsCount) { window.SFX.finding(); return; }
-  if (after.rankSeen > before.rankSeen) { window.SFX.rankUp(); return; }
-  if (after.contam >= 70 && before.contam < 70) { window.SFX.danger(); return; }
-  if (after.contam >= 40 && before.contam < 40) { window.SFX.warning(); return; }
+  if (after.findingsCount > before.findingsCount) { window.SFX.finding(); showToast(t("toast_finding")); return; }
+  if (after.rankSeen > before.rankSeen) { window.SFX.rankUp(); showToast(t("toast_rankup") + ": " + E.rankName(after.rankSeen)); return; }
+  if (after.contam >= 70 && before.contam < 70) { window.SFX.danger(); showToast(t("toast_danger"), "danger"); return; }
+  if (after.contam >= 40 && before.contam < 40) { window.SFX.warning(); showToast(t("toast_warning"), "warn"); return; }
 }
 
 async function handleLine(raw) {

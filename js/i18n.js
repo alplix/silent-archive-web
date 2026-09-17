@@ -27,9 +27,19 @@ const UI_STRINGS = {
     st_findings: "Bulgu",
     st_contam: "Kontaminasyon",
     browser_title: "KAYITLAR",
+    browser_tab_records: "Kayıtlar",
+    browser_tab_findings: "Bulgular",
+    browser_search_ph: "ara...",
     browser_locked: "kilitli",
     browser_read: "okundu",
     browser_empty: "Bu perdede erişilebilir kayıt yok.",
+    browser_no_match: "Eşleşme yok.",
+    findings_empty: "Henüz bulgu yok. İki okunmuş kaydı karşılaştırın.",
+    toast_finding: "YENİ BULGU",
+    toast_rankup: "RÜTBE ATLADINIZ",
+    toast_danger: "KONTAMİNASYON KRİTİK",
+    toast_warning: "KONTAMİNASYON YÜKSELİYOR",
+    day_urgent: "Son gün yaklaşıyor",
     cross_tray_hint: "Karşılaştırmak için iki okunmuş kayıt seçin:",
     cross_tray_go: "Karşılaştır",
     cross_tray_need_one_more: "1 kayıt daha seçin",
@@ -85,9 +95,19 @@ const UI_STRINGS = {
     st_findings: "Findings",
     st_contam: "Contamination",
     browser_title: "RECORDS",
+    browser_tab_records: "Records",
+    browser_tab_findings: "Findings",
+    browser_search_ph: "search...",
     browser_locked: "locked",
     browser_read: "read",
     browser_empty: "No accessible records in this act.",
+    browser_no_match: "No matches.",
+    findings_empty: "No findings yet. Compare two records you've read.",
+    toast_finding: "NEW FINDING",
+    toast_rankup: "RANK UP",
+    toast_danger: "CONTAMINATION CRITICAL",
+    toast_warning: "CONTAMINATION RISING",
+    day_urgent: "Final day approaching",
     cross_tray_hint: "Pick two records you've read to compare:",
     cross_tray_go: "Compare",
     cross_tray_need_one_more: "pick 1 more",
@@ -158,6 +178,10 @@ function applyStaticI18n() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     el.textContent = t(key);
+  });
+  document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-ph");
+    el.setAttribute("placeholder", t(key));
   });
 }
 

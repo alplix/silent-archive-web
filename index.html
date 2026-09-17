@@ -9,6 +9,9 @@
 </head>
 <body>
 
+<div id="toast-stack"></div>
+<div id="tension-vignette"></div>
+
 <div id="lang-switch" class="lang-switch">
   <button class="lang-opt" data-lang="tr">TR</button>
   <span class="lang-sep">/</span>
@@ -73,8 +76,11 @@
     <div id="sidebar">
       <div id="dashboard">
         <div class="stat-row"><span class="stat-label" data-i18n="st_clearance">…</span><span id="stat-clearance" class="stat-val"></span></div>
-        <div class="stat-row"><span class="stat-label" data-i18n="st_day">…</span><span id="stat-day" class="stat-val"></span></div>
         <div class="stat-row"><span class="stat-label" data-i18n="st_findings">…</span><span id="stat-findings" class="stat-val"></span></div>
+        <div class="stat-block">
+          <div class="stat-block-top"><span class="stat-label" data-i18n="st_day">…</span><span id="stat-day" class="stat-val"></span></div>
+          <div class="meter"><div id="meter-day" class="meter-fill day"></div></div>
+        </div>
         <div class="stat-block">
           <div class="stat-block-top"><span class="stat-label" data-i18n="st_contam">…</span><span id="stat-contam-pct" class="stat-val"></span></div>
           <div class="meter"><div id="meter-contam" class="meter-fill"></div></div>
@@ -91,6 +97,11 @@
         <button id="cross-tray-go" data-i18n="cross_tray_go">…</button>
       </div>
 
+      <div id="browser-tabs" class="tabs mini">
+        <button class="rb-tab active" data-tab="records" data-i18n="browser_tab_records">…</button>
+        <button class="rb-tab" data-tab="findings" data-i18n="browser_tab_findings">…</button>
+      </div>
+      <input id="rb-search" type="text" data-i18n-ph="browser_search_ph" autocomplete="off">
       <div id="record-browser"></div>
     </div>
 
