@@ -1,0 +1,18 @@
+{
+ "lang": "en",
+ "day": 3,
+ "clearance": 2,
+ "contam": 5,
+ "xp": 90,
+ "rank_seen": 1,
+ "read": [
+  "SCP-173",
+  "SCP-096"
+ ],
+ "findings": [
+  "f01_imza"
+ ],
+ "amnestics": 4,
+ "fast": false,
+ "updatedAt": "2026-09-17T15:32:08.357Z"
+}
