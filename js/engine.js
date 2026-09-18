@@ -20,6 +20,7 @@ const Engine = (() => {
   let ENDING_DEFS = null;
   let MAIL_DEFS = null;
   let RANKS = null;
+  let CROSS_LIST = [];   // [{a, b, finding}] in manifest order
   let CROSS_MAP = null;   // Map: "a|b" (sorted) -> finding id
   let LANGS = null;       // {code: data}
   let BASE_LANG = "en";
@@ -68,6 +69,7 @@ const Engine = (() => {
     RANKS = M.ranks || [{ id: "stajyer", at: 0 }];
 
     CROSS_MAP = new Map();
+    CROSS_LIST = M.cross.map((c) => ({ a: c.a, b: c.b, finding: c.finding }));
     for (const c of M.cross) {
       const key = [c.a, c.b].sort().join("|");
       CROSS_MAP.set(key, c.finding);
@@ -471,6 +473,44 @@ const Engine = (() => {
     return { lines };
   }
 
+  // Pairs of records the player has read that hide a finding they haven't
+  // recorded yet. Drives the sidebar counter and the first kind of hint.
+  function readyPairs() {
+    return CROSS_LIST.filter((c) =>
+      !STATE.findings.includes(c.finding) && STATE.read.includes(c.a) && STATE.read.includes(c.b));
+  }
+
+  const HINT_COST = 2; // contamination, so hints are a trade-off rather than free
+
+  function cmdHint() {
+    const lines = [];
+    const ready = readyPairs();
+    let msg = null;
+    if (ready.length) {
+      msg = T("ui", "hint_ready").replace("{a}", ready[0].a).replace("{b}", ready[0].b);
+    } else {
+      let locked = null;
+      for (const c of CROSS_LIST) {
+        if (STATE.findings.includes(c.finding)) continue;
+        const aRead = STATE.read.includes(c.a), bRead = STATE.read.includes(c.b);
+        if (aRead === bRead) continue; // both read is handled above; neither read isn't a lead yet
+        const known = aRead ? c.a : c.b, other = aRead ? c.b : c.a;
+        if (accessible(other)) {
+          msg = T("ui", "hint_partner").replace("{a}", known).replace("{b}", other);
+          break;
+        }
+        if (!locked) locked = known;
+      }
+      if (!msg && locked) msg = T("ui", "hint_locked").replace("{a}", locked);
+      if (!msg) msg = T("ui", "hint_none");
+    }
+    lines.push({ text: "", cls: "" });
+    lines.push({ text: "  " + msg, cls: "cyan" });
+    lines.push({ text: "  " + T("ui", "hint_cost").replace("{n}", String(HINT_COST)), cls: "dim darkgreen" });
+    addContam(HINT_COST, lines);
+    return { lines };
+  }
+
   function cmdFindings() {
     const lines = [];
     lines.push({
@@ -772,6 +812,7 @@ const Engine = (() => {
   }
 
   const DISPATCH = {
+    hint: cmdHint,
     help: cmdHelp, list: cmdList, read: cmdRead, search: cmdSearch,
     cross: cmdCross, findings: cmdFindings, mail: cmdMail, status: cmdStatus,
     rest: cmdRest, code: cmdCode, amnestic: cmdAmnestic, report: cmdReport,
@@ -830,12 +871,13 @@ const Engine = (() => {
   return {
     boot, T, fold, newState, getState, setState,
     runCommand, isYes, prompt, loadSanitizedState,
-    accessible, accessibleRecords,
+    accessible, accessibleRecords, readyPairs,
     get RECORDS() { return RECORDS; },
     get RECORD_ORDER() { return RECORD_ORDER; },
     get FINDING_ORDER() { return FINDING_ORDER; },
     get RULES() { return RULES; },
     get RANKS() { return RANKS; },
+    get ENDING_IDS() { return ENDING_DEFS.map((e) => e.id).concat(["silindi", "rotasyon"]); },
     get LANGS() { return LANGS; },
     get BASE_LANG() { return BASE_LANG; },
     rankIndex, rankName,

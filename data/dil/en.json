@@ -6,6 +6,8 @@
   "coverage": "full"
  },
  "commands": {
+  "hint": "hint",
+  "hints": "hint",
   "help": "help",
   "h": "help",
   "list": "list",
@@ -1622,6 +1624,7 @@
    "rest                   end the day: contamination falls, a day is spent",
    "amnestic               Class-C dose: contamination drops, findings are lost",
    "report                 end the audit and decide",
+   "hint                   a nudge toward the next finding (costs a little contamination)",
    "",
    "lang / lang tr         change language",
    "speed                  toggle the typewriter effect",
@@ -1649,6 +1652,11 @@
   "cross_unread": "You must read {f} first.",
   "cross_header": "CROSS-REFERENCE: {a}  x  {b}",
   "cross_nothing": "No meaningful contradiction found between these two records.",
+  "hint_ready": "HINT: your notes hold a contradiction you haven't recorded yet. Compare {a} and {b}.",
+  "hint_partner": "HINT: {a} is not the whole story. Something that contradicts it is filed under {b}. Read it, then compare the two.",
+  "hint_locked": "HINT: {a} contradicts something you aren't cleared to see yet. A higher clearance (or a key hidden inside a document) will open it.",
+  "hint_none": "HINT: nothing to compare right now. Read more files (list), or search for a name that keeps coming up.",
+  "hint_cost": "(The archive noticed you asking. Contamination +{n}%.)",
   "cross_match": "INCONSISTENCY DETECTED",
   "cross_known": "This finding is already in your notebook:",
   "new_mail": "* You have {n} unread message(s). ('mail')",

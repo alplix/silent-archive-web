@@ -6,6 +6,7 @@
   "coverage": "full"
  },
  "commands": {
+  "indice": "hint",
   "help": "help",
   "h": "help",
   "list": "list",
@@ -1656,6 +1657,7 @@
    "reposer                termine la journée : la contamination baisse, un jour est utilisé",
    "amnesique              dose de Classe C : la contamination baisse, des constats sont perdus",
    "rapport                termine l'audit et décide",
+   "indice                 un coup de pouce vers le prochain constat (coûte un peu de contamination)",
    "",
    "langue / langue en     changer de langue",
    "vitesse                active/désactive l'effet machine à écrire",
@@ -1683,6 +1685,11 @@
   "cross_unread": "Vous devez d'abord lire {f}.",
   "cross_header": "RECOUPEMENT : {a}  x  {b}",
   "cross_nothing": "Aucune contradiction significative trouvée entre ces deux registres.",
+  "hint_ready": "INDICE : vos notes contiennent une contradiction non encore consignée. Comparez {a} et {b}.",
+  "hint_partner": "INDICE : {a} ne dit pas tout. Quelque chose qui le contredit est classé sous {b}. Lisez-le, puis comparez les deux.",
+  "hint_locked": "INDICE : {a} contredit quelque chose que vous n'êtes pas encore habilité à voir. Une habilitation supérieure (ou une clé cachée dans un document) l'ouvrira.",
+  "hint_none": "INDICE : rien à comparer pour l'instant. Lisez d'autres documents (liste) ou cherchez un nom qui revient sans cesse.",
+  "hint_cost": "(L'archive a remarqué que vous demandiez. Contamination +{n} %.)",
   "cross_match": "INCOHÉRENCE DÉTECTÉE",
   "cross_known": "Ce constat est déjà dans votre carnet :",
   "new_mail": "* Vous avez {n} message(s) non lu(s). ('courrier')",

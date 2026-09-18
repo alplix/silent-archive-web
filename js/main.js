@@ -85,6 +85,7 @@ function wireAuthScreen() {
   btn.textContent = window.I18N.t(key);
   btn.addEventListener("click", () => startGame(window.I18N.getUiLang()));
   freshEl("#signin-btn").addEventListener("click", openAccount);
+  paintEndingsCount();
   btn.focus();
 }
 
@@ -143,6 +144,9 @@ function renderDashboard() {
   $("#stat-clearance").textContent = `${s.clearance} / ${E.RULES.clearance_max}`;
   $("#stat-day").textContent = `${s.day} / ${E.RULES.days_max}`;
   $("#stat-findings").textContent = `${s.findings.length} / ${E.FINDING_ORDER.length}`;
+  const ready = E.readyPairs().length;
+  $("#stat-ready").textContent = ready;
+  $("#stat-ready").classList.toggle("hot", ready > 0);
 
   const dayPct = Math.min(100, Math.round((s.day / E.RULES.days_max) * 100));
   const dayMeter = $("#meter-day");
@@ -707,6 +711,12 @@ async function handleLine(raw) {
 
 function handleEnding(ended) {
   gameOver = true;
+  if (ended && ended.id) {
+    const E = window.Engine;
+    const full = ended.kind === "finish" &&
+      E.getState().findings.length / E.FINDING_ORDER.length >= E.RULES.ending_full_ratio;
+    if (recordEnding(ended.id, full)) showToast(window.I18N.t("endings_new"));
+  }
   $("#cmd-input").disabled = true;
   window.SFX.ending();
   clearSave();
@@ -714,6 +724,69 @@ function handleEnding(ended) {
   printLine(window.I18N.t("session_ended_1"), "dim amber");
   printLine(window.I18N.t("session_ended_2"), "dim amber");
 }
+
+// ---------------------------------------------------------------------------
+// endings tracker (per browser): which endings were reached, and whether with
+// a full set of findings.
+// ---------------------------------------------------------------------------
+
+const ENDINGS_KEY = "silent-archive-endings";
+
+function readEndings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ENDINGS_KEY) || "{}");
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  } catch { return {}; }
+}
+
+// Returns true when this ending had never been reached before.
+function recordEnding(id, full) {
+  const seen = readEndings();
+  const isNew = !(id in seen);
+  seen[id] = full || seen[id] === "full" ? "full" : "partial";
+  try { localStorage.setItem(ENDINGS_KEY, JSON.stringify(seen)); } catch { /* ignore */ }
+  paintEndingsCount();
+  return isNew;
+}
+
+function paintEndingsCount() {
+  const E = window.Engine;
+  const el = $("#endings-count");
+  if (!el || !E.ENDING_IDS) return;
+  const n = Object.keys(readEndings()).filter((id) => E.ENDING_IDS.includes(id)).length;
+  el.textContent = n
+    ? window.I18N.t("endings_count").replace("{n}", n).replace("{t}", E.ENDING_IDS.length)
+    : "";
+}
+
+function openEndings() {
+  const E = window.Engine;
+  const t = window.I18N.t;
+  const seen = readEndings();
+  const list = $("#endings-list");
+  list.innerHTML = "";
+  for (const id of E.ENDING_IDS) {
+    const li = document.createElement("li");
+    if (seen[id]) {
+      li.className = "seen";
+      const title = E.T("endings", id, "title", { default: id }).replace(/^\s*(ENDING|SON|FINAL|FIN)\s*[—-]\s*/i, "");
+      li.textContent = title + "  [" + t(seen[id] === "full" ? "endings_full" : "endings_partial") + "]";
+    } else {
+      li.textContent = t("endings_locked");
+    }
+    list.appendChild(li);
+  }
+  $("#endings-modal").classList.remove("hidden");
+}
+
+function closeEndings() {
+  $("#endings-modal").classList.add("hidden");
+  const input = $("#cmd-input");
+  if (inGame && input && !input.disabled) input.focus();
+}
+
+$("#endings-btn").addEventListener("click", openEndings);
+$("#endings-close").addEventListener("click", closeEndings);
 
 // ---------------------------------------------------------------------------
 // persistence

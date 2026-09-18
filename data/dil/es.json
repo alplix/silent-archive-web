@@ -6,6 +6,7 @@
   "coverage": "full"
  },
  "commands": {
+  "pista": "hint",
   "help": "help",
   "h": "help",
   "list": "list",
@@ -1658,6 +1659,7 @@
    "descansar              termina el día: la contaminación baja, se gasta un día",
    "amnesico               dosis Clase C: la contaminación baja, se pierden hallazgos",
    "informe                termina la auditoría y decide",
+   "pista                  un empujón hacia el siguiente hallazgo (cuesta algo de contaminación)",
    "",
    "idioma / idioma en     cambiar de idioma",
    "velocidad              activa/desactiva el efecto de máquina de escribir",
@@ -1685,6 +1687,11 @@
   "cross_unread": "Primero debe leer {f}.",
   "cross_header": "REFERENCIA CRUZADA: {a}  x  {b}",
   "cross_nothing": "No se encontró ninguna contradicción significativa entre estos dos registros.",
+  "hint_ready": "PISTA: sus notas guardan una contradicción que aún no ha registrado. Compare {a} y {b}.",
+  "hint_partner": "PISTA: {a} no lo cuenta todo. Algo que lo contradice está archivado en {b}. Léalo y compare ambos.",
+  "hint_locked": "PISTA: {a} contradice algo que aún no tiene autorización para ver. Una autorización mayor (o una clave escondida en un documento) lo abrirá.",
+  "hint_none": "PISTA: nada que comparar por ahora. Lea más archivos (lista) o busque un nombre que no deja de aparecer.",
+  "hint_cost": "(El archivo notó que preguntaba. Contaminación +{n}%.)",
   "cross_match": "INCONSISTENCIA DETECTADA",
   "cross_known": "Este hallazgo ya está en su cuaderno:",
   "new_mail": "* Tiene {n} mensaje(s) sin leer. ('correo')",

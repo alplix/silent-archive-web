@@ -6,6 +6,7 @@
   "coverage": "full"
  },
  "commands": {
+  "ipucu": "hint",
   "help": "help",
   "h": "help",
   "list": "list",
@@ -1660,6 +1661,7 @@
    "dinlen                 günü bitir: kontaminasyon düşer, bir gün gider",
    "amnezik                C sınıfı doz: kontaminasyon düşer, bulgu kaybolur",
    "rapor                  denetimi bitir ve karar ver",
+   "ipucu                  bir sonraki bulguya işaret eder (biraz kontaminasyona mal olur)",
    "",
    "dil / dil en           dili değiştir",
    "hiz                    daktilo efektini aç/kapat",
@@ -1687,6 +1689,11 @@
   "cross_unread": "Önce {f} dosyasını okumalısınız.",
   "cross_header": "ÇAPRAZ REFERANS: {a}  x  {b}",
   "cross_nothing": "Bu iki kayıt arasında anlamlı bir çelişki bulunamadı.",
+  "hint_ready": "İPUCU: notlarınızda henüz kaydetmediğiniz bir çelişki var. {a} ile {b} dosyalarını karşılaştırın.",
+  "hint_partner": "İPUCU: {a} işin tamamı değil. Onunla çelişen bir şey {b} altında duruyor. Okuyun, sonra ikisini karşılaştırın.",
+  "hint_locked": "İPUCU: {a} henüz görmeye yetkili olmadığınız bir şeyle çelişiyor. Daha yüksek yetki (ya da bir belgenin içine gizlenmiş bir anahtar) onu açar.",
+  "hint_none": "İPUCU: şu an karşılaştırılacak bir şey yok. Daha fazla dosya okuyun (liste) ya da sürekli karşınıza çıkan bir ismi arayın.",
+  "hint_cost": "(Arşiv sorduğunuzu fark etti. Kontaminasyon +%{n}.)",
   "cross_match": "TUTARSIZLIK SAPTANDI",
   "cross_known": "Bu bulgu zaten defterinizde:",
   "new_mail": "* {n} okunmamış mesajınız var. ('posta')",
