@@ -30,16 +30,7 @@
   \__ \ (__| |  _/| .` | _|  | |
   |___/\___|_|_|  |_|\_|___| |_|</pre>
   <div class="panel">
-    <p class="dim small" data-i18n="github_hint">…</p>
-
-    <form id="login-form" class="auth-form">
-      <label><span data-i18n="lbl_github_username">…</span><input type="text" id="login-username" required maxlength="39" autocomplete="username" data-i18n-ph="github_username_ph"></label>
-      <button type="submit" data-i18n="btn_continue">…</button>
-      <p class="err" id="login-err"></p>
-    </form>
-
-    <div class="or-row"><span data-i18n="or_row">…</span></div>
-    <button id="guest-btn" class="secondary" data-i18n="btn_guest">…</button>
+    <button id="play-btn" class="play-btn" data-i18n="btn_play">...</button>
   </div>
 </div>
 
@@ -47,14 +38,11 @@
   <div id="topbar">
     <span class="topbar-left">
       <button id="sidebar-toggle" class="link-btn" aria-label="menu">☰</button>
-      <span id="topbar-user"></span>
     </span>
     <span class="topbar-actions">
       <button id="sfx-toggle" class="link-btn">🔊</button>
-      <button id="sync-btn" class="link-btn hidden" data-i18n="btn_sync">…</button>
+      <button id="savefile-btn" class="link-btn" data-i18n="savefile_btn">…</button>
       <button id="tutorial-btn" class="link-btn" data-i18n="tut_button">…</button>
-      <button id="leaderboard-btn" class="link-btn" data-i18n="nav_leaderboard">…</button>
-      <button id="logout-btn" class="link-btn" data-i18n="nav_logout">…</button>
     </span>
   </div>
 
@@ -109,40 +97,22 @@
   </div>
 </div>
 
-<div id="sync-modal" class="modal hidden">
+<div id="savefile-modal" class="modal hidden">
   <div class="modal-box">
-    <h2 data-i18n="sync_title">…</h2>
-    <p id="sync-body" class="small"></p>
-    <p class="small"><a id="sync-token-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" data-i18n="sync_get_token">…</a></p>
-    <input id="sync-token" type="password" autocomplete="off" spellcheck="false" data-i18n-ph="sync_token_ph">
-    <p id="sync-status" class="err"></p>
+    <h2 data-i18n="savefile_title">…</h2>
+    <p class="small" data-i18n="savefile_help">…</p>
     <div class="modal-actions">
-      <button id="sync-enable" data-i18n="sync_enable">…</button>
-      <button id="sync-manual" class="secondary" data-i18n="sync_manual">…</button>
-      <button id="sync-disable" class="secondary hidden" data-i18n="sync_disable">…</button>
-      <button id="sync-close" class="secondary" data-i18n="btn_close">…</button>
+      <button id="savefile-download" data-i18n="savefile_download">…</button>
+      <button id="savefile-load" class="secondary" data-i18n="savefile_load">…</button>
+      <input id="savefile-input" type="file" accept=".json,application/json" class="hidden">
+    </div>
+    <p id="savefile-status" class="err"></p>
+    <div class="modal-actions">
+      <button id="savefile-close" class="secondary" data-i18n="btn_close">…</button>
     </div>
   </div>
 </div>
 
-<div id="leaderboard-modal" class="modal hidden">
-  <div class="modal-box">
-    <h2 data-i18n="lb_title">…</h2>
-    <table id="leaderboard-table">
-      <thead><tr>
-        <th>#</th>
-        <th data-i18n="lb_col_name">…</th>
-        <th data-i18n="lb_col_rank">…</th>
-        <th data-i18n="lb_col_xp">…</th>
-        <th data-i18n="lb_col_findings">…</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table>
-    <button id="leaderboard-close" data-i18n="btn_close">…</button>
-  </div>
-</div>
-
-<script type="module" src="js/auth.js"></script>
 <script src="js/languages.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/i18n.js"></script>

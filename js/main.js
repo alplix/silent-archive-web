@@ -1,5 +1,3 @@
-import * as Auth from "./auth.js";
-
 const $ = (sel) => document.querySelector(sel);
 const screens = {
   boot: $("#boot-screen"), auth: $("#auth-screen"), game: $("#game-screen"),
@@ -12,7 +10,6 @@ function showScreen(name) {
 
 const LOCAL_SAVE_KEY = "sessiz-arsiv-save-v1";
 
-let currentUser = null;   // { username } linked for GitHub sync, or null for local/guest play
 let inGame = false;
 let awaitingConfirm = null;
 let awaitingReportChoice = null;
@@ -37,7 +34,6 @@ function wireLangSwitch() {
     sel.addEventListener("change", () => {
       const code = sel.value;
       window.I18N.setUiLang(code);
-      updateTopbarText();
       if (inGame) {
         const E = window.Engine;
         const state = E.getState();
@@ -65,88 +61,57 @@ async function boot() {
     return;
   }
 
-  // If a GitHub username is already linked, skip the auth screen and
-  // resume directly.
-  let unsub;
-  unsub = Auth.watchAuth((user) => {
-    if (unsub) unsub();
-    if (user) {
-      currentUser = user;
-      startGame(window.I18N.getUiLang());
-    } else {
-      showScreen("auth");
-      wireAuthScreen();
-    }
-  });
+  // Returning player: pick up exactly where they left off, no clicks.
+  if (readLocalSave()) {
+    startGame(window.I18N.getUiLang());
+    return;
+  }
+  showScreen("auth");
+  wireAuthScreen();
 }
 
 // ---------------------------------------------------------------------------
-// auth screen
+// start screen: one button. (Also shown after `quit`, as "Continue".)
 // ---------------------------------------------------------------------------
 
 function wireAuthScreen() {
-  // wireAuthScreen() can run more than once per page load (e.g. quit then
-  // log back in without a full reload) — clone-and-replace first so old
-  // listeners don't stack up and double-submit.
-  const usernameField = $("#login-username");
-  if (usernameField) usernameField.value = Auth.getUsername() || "";
-
-  freshEl("#login-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    $("#login-err").textContent = "";
-    try {
-      currentUser = Auth.loginWithUsername($("#login-username").value);
-      startGame(window.I18N.getUiLang());
-    } catch (err) {
-      $("#login-err").textContent = friendlyAuthError(err);
-    }
-  });
-
-  freshEl("#guest-btn").addEventListener("click", () => {
-    currentUser = null; // pure local/guest mode, nothing synced to GitHub
-    startGame(window.I18N.getUiLang());
-  });
-}
-
-function friendlyAuthError(err) {
-  const msg = String((err && err.message) || err);
-  const t = window.I18N.t;
-  if (msg.includes("err_bad_username")) return t("err_bad_username");
-  return msg;
+  // Can run more than once per page load — clone-and-replace so listeners
+  // from an earlier visit don't stack up.
+  const btn = freshEl("#play-btn");
+  const key = readLocalSave() ? "btn_continue" : "btn_play";
+  btn.dataset.i18n = key;
+  btn.textContent = window.I18N.t(key);
+  btn.addEventListener("click", () => startGame(window.I18N.getUiLang()));
+  btn.focus();
 }
 
 // ---------------------------------------------------------------------------
 // game
 // ---------------------------------------------------------------------------
 
-async function startGame(langCode) {
+async function startGame(langCode, restored = null) {
   gameOver = false;
   const E = window.Engine;
   if (!E.LANGS[langCode]) langCode = E.BASE_LANG;
 
-  // Local save wins if present (always fresh — every command writes it).
-  // The GitHub-synced save is only for resuming on a fresh browser/device,
-  // since syncing is a manual, occasional action rather than continuous.
+  // This browser's save is written after every command, so it is always the
+  // freshest. A save file the player just loaded beats it, on purpose.
   let state = null;
-  const local = readLocalSave();
-  if (local) state = E.loadSanitizedState(local, langCode);
-  if (!state && currentUser) {
-    try {
-      const cloud = await Auth.loadSave(currentUser.username);
-      if (cloud) state = E.loadSanitizedState(cloud, langCode);
-    } catch (err) {
-      console.warn("GitHub save load failed, starting fresh", err);
-    }
+  if (restored) {
+    state = E.loadSanitizedState(restored, langCode);
+  } else {
+    const local = readLocalSave();
+    if (local) state = E.loadSanitizedState(local, langCode);
   }
   if (!state) state = E.newState(langCode);
   state.lang = langCode;
   E.setState(state);
+  if (restored) writeLocalSave(state);
 
   inGame = true;
   crossPicks = [];
   showScreen("game");
   $("#terminal").innerHTML = "";
-  updateTopbarText();
 
   printIntro();
   updatePromptTag();
@@ -156,7 +121,6 @@ async function startGame(langCode) {
   wireBrowserTabsAndSearch();
   renderRecordBrowser();
   wireSidebar();
-  wireSyncButton();
   wireInput();
   $("#cmd-input").focus();
 
@@ -458,15 +422,6 @@ function maybeShowTutorial() {
 $("#tutorial-btn").addEventListener("click", openTutorial);
 $("#tutorial-close").addEventListener("click", closeTutorial);
 
-function updateTopbarText() {
-  if (!inGame) return;
-  $("#topbar-user").textContent = currentUser
-    ? `${window.I18N.t("operator_label")}: ${Auth.displayNameFor(currentUser)}`
-    : window.I18N.t("guest_mode");
-  $("#sync-btn").classList.toggle("hidden", !currentUser);
-  updateSyncButton();
-}
-
 async function printIntro() {
   const E = window.Engine;
   const fast = E.getState().fast;
@@ -626,29 +581,25 @@ async function handleLine(raw) {
     awaitingConfirm = null;
     const before = snapshot(E.getState());
     const res = fn(E.isYes(raw));
+    persist();
     await printLines(res.lines);
     playCueFor(before, E.getState());
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
     refreshSidebar();
-    persist();
+    if (!gameOver) persist();
     return;
   }
   if (awaitingReportChoice) {
     const fn = awaitingReportChoice;
     awaitingReportChoice = null;
     const res = fn(raw.trim());
+    persist();
     await printLines(res.lines);
     if (res.ended) handleEnding(res.ended);
     updatePromptTag();
     refreshSidebar();
-    persist();
-    return;
-  }
-
-  const folded = E.fold(raw.trim());
-  if (folded === "leaderboard" || folded === "liderlik" || folded === "lider") {
-    openLeaderboard();
+    if (!gameOver) persist();
     return;
   }
 
@@ -657,7 +608,7 @@ async function handleLine(raw) {
   if (!result) return;
 
   if (result.hostVerb === "save") {
-    await persist(true);
+    persist();
     printLine(E.T("ui", "saved"), "cyan");
     updatePromptTag();
     return;
@@ -671,13 +622,15 @@ async function handleLine(raw) {
   }
   if (result.hostVerb === "quit") {
     printLine(E.T("ui", "bye"), "dim darkgreen");
-    await persist(true);
+    persist();
     gameOver = true;
     inGame = false;
     $("#cmd-input").disabled = true;
     setTimeout(() => { showScreen("auth"); wireAuthScreen(); }, 900);
     return;
   }
+
+  persist();
 
   if (result.clearScreen) {
     $("#terminal").innerHTML = "";
@@ -694,7 +647,7 @@ async function handleLine(raw) {
 
   updatePromptTag();
   refreshSidebar();
-  persist();
+  if (!gameOver) persist();
 }
 
 function handleEnding(ended) {
@@ -729,12 +682,11 @@ function clearSave() {
   // button opening a real GitHub issue), never silently from here.
 }
 
-// Local save happens on every state-changing action (see handleLine()).
-// If the player has enabled auto-save (their own GitHub token, see
-// js/auth.js), the change also queues a throttled push to GitHub.
+// Progress is written to this browser after every command, so it resumes
+// where the player left off with nothing to press. There is deliberately no
+// server: the save file below is how progress moves between devices.
 function persist() {
   writeLocalSave(window.Engine.getState());
-  markSyncDirty();
 }
 
 async function reloadSave() {
@@ -745,173 +697,88 @@ async function reloadSave() {
 }
 
 // ---------------------------------------------------------------------------
-// GitHub auto-save: throttled, so a burst of commands becomes one sync (each
-// sync is an issue edit -> a workflow run -> a commit on the player-data
-// branch, so don't send one per keystroke).
+// save file: download progress as a .json, load it on another device/browser
 // ---------------------------------------------------------------------------
 
-const SYNC_FIRST_DELAY_MS = 15000;
-const SYNC_MIN_GAP_MS = 120000;
-let syncTimer = null;
-let syncDirty = false;
-let syncBlocked = false;   // token rejected: stop retrying until it's re-entered
-let lastSyncAt = 0;
+const SAVEFILE_MAX_BYTES = 200000;
 
-function markSyncDirty() {
-  if (!currentUser || !Auth.hasToken() || syncBlocked) return;
-  syncDirty = true;
-  if (syncTimer) return;
-  const wait = Math.max(SYNC_FIRST_DELAY_MS, lastSyncAt + SYNC_MIN_GAP_MS - Date.now());
-  syncTimer = setTimeout(() => { syncTimer = null; runAutoSync(); }, wait);
+// Keeps only the game's known fields with sane values, so a hand-edited or
+// foreign file can't inject anything else into the game state.
+function sanitizeImported(raw) {
+  const int = (v, lo, hi) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.trunc(v))) : undefined);
+  const strs = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.length <= 80).slice(0, 2000) : undefined);
+  const clean = {
+    clearance: int(raw.clearance, 0, 10),
+    contam: int(raw.contam, 0, 100),
+    day: int(raw.day, 1, 50),
+    xp: int(raw.xp, 0, 1000000),
+    rank_seen: int(raw.rank_seen, 0, 20),
+    turns: int(raw.turns, 0, 100000000),
+    cure_used: int(raw.cure_used, 0, 1000),
+    amnestics: int(raw.amnestics, 0, 100),
+    read: strs(raw.read),
+    findings: strs(raw.findings),
+    mail_read: strs(raw.mail_read),
+    thresholds_fired: Array.isArray(raw.thresholds_fired) ? raw.thresholds_fired.filter(Number.isFinite).slice(0, 20) : undefined,
+    fast: typeof raw.fast === "boolean" ? raw.fast : undefined,
+  };
+  for (const k of Object.keys(clean)) if (clean[k] === undefined) delete clean[k];
+  return clean;
 }
 
-// Returns true on success (or when there's nothing to do).
-async function runAutoSync({ keepalive = false, force = false } = {}) {
-  if (!currentUser || !Auth.hasToken()) return true;
-  if (!syncDirty && !force) return true;
-  syncDirty = false;
-  const t = window.I18N.t;
-  try {
-    await Auth.autoSync(window.Engine.getState(), currentUser.username, { keepalive });
-    lastSyncAt = Date.now();
-    updateSyncButton(true);
-    return true;
-  } catch (err) {
-    syncDirty = true;
-    if (err && [401, 403, 404].includes(err.status)) {
-      syncBlocked = true;
-      updateSyncButton(false);
-      if (!keepalive) showToast(t("toast_sync_auth"), "danger");
-    } else if (!keepalive) {
-      showToast(t("toast_sync_fail"), "warn");
-      lastSyncAt = Date.now(); // wait a full gap before retrying
-      markSyncDirty();
-    }
-    return false;
-  }
+function openSaveFile() {
+  $("#savefile-status").textContent = "";
+  $("#savefile-modal").classList.remove("hidden");
 }
 
-// Last-chance push when the tab is hidden/closed.
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden") return;
-  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
-  if (syncDirty) runAutoSync({ keepalive: true });
-});
-
-function updateSyncButton(ok) {
-  const btn = $("#sync-btn");
-  if (!btn) return;
-  const on = Auth.hasToken() && !syncBlocked;
-  btn.textContent = window.I18N.t("btn_sync") + (on ? (ok === false ? " !" : " ●") : "");
-}
-
-function closeSyncModal() {
-  $("#sync-modal").classList.add("hidden");
+function closeSaveFile() {
+  $("#savefile-modal").classList.add("hidden");
   const input = $("#cmd-input");
   if (input && !input.disabled) input.focus();
 }
 
-function openSyncModal() {
-  const t = window.I18N.t;
-  $("#sync-body").textContent = t("sync_body").replace("{repo}", Auth.REPO_SLUG);
-  $("#sync-token").value = "";
-  $("#sync-status").textContent = "";
-  $("#sync-disable").classList.toggle("hidden", !Auth.hasToken());
-  $("#sync-modal").classList.remove("hidden");
-  $("#sync-token").focus();
-}
+$("#savefile-btn").addEventListener("click", openSaveFile);
+$("#savefile-close").addEventListener("click", closeSaveFile);
 
-async function enableAutoSync() {
-  const t = window.I18N.t;
-  const token = $("#sync-token").value.trim();
-  if (!token) return;
-  Auth.setToken(token);
-  syncBlocked = false;
-  $("#sync-status").textContent = "...";
-
-  // The token proves who the player really is; prefer that over the typed name.
-  const login = await Auth.whoami();
-  if (login) {
-    Auth.setUsername(login);
-    currentUser = { username: login };
-    updateTopbarText();
-  }
-
-  const ok = await runAutoSync({ force: true });
-  if (ok) {
-    closeSyncModal();
-    showToast(t("toast_synced"));
-  } else {
-    // runAutoSync already flagged a bad token; don't keep a token that fails.
-    if (syncBlocked) Auth.setToken(null);
-    $("#sync-status").textContent = t(syncBlocked ? "toast_sync_auth" : "toast_sync_fail");
-    updateSyncButton();
-  }
-}
-
-function disableAutoSync() {
-  Auth.setToken(null);
-  syncDirty = false;
-  syncBlocked = false;
-  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
-  updateSyncButton();
-  closeSyncModal();
-}
-
-function wireSyncButton() {
-  freshEl("#sync-btn").addEventListener("click", () => {
-    if (currentUser) openSyncModal();
-  });
-  updateSyncButton();
-}
-
-$("#sync-enable").addEventListener("click", enableAutoSync);
-$("#sync-disable").addEventListener("click", disableAutoSync);
-$("#sync-close").addEventListener("click", closeSyncModal);
-$("#sync-token").addEventListener("keydown", (e) => { if (e.key === "Enter") enableAutoSync(); });
-$("#sync-manual").addEventListener("click", () => {
-  Auth.submitSync(window.Engine.getState());
-  closeSyncModal();
+$("#savefile-download").addEventListener("click", () => {
+  persist();
+  const payload = {
+    game: "silent-archive",
+    version: 1,
+    savedAt: new Date().toISOString(),
+    state: window.Engine.getState(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `silent-archive-save-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
-// ---------------------------------------------------------------------------
-// leaderboard modal + topbar
-// ---------------------------------------------------------------------------
+$("#savefile-load").addEventListener("click", () => $("#savefile-input").click());
 
-async function openLeaderboard() {
+$("#savefile-input").addEventListener("change", async (e) => {
   const t = window.I18N.t;
-  const modal = $("#leaderboard-modal");
-  modal.classList.remove("hidden");
-  const tbody = document.querySelector("#leaderboard-table tbody");
-  tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_loading"))}</td></tr>`;
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
   try {
-    const rows = await Auth.fetchLeaderboard(50);
-    const E = window.Engine;
-    tbody.innerHTML = "";
-    rows.forEach((r, i) => {
-      const rankName = r.rankId ? E.T("ranks", r.rankId, { default: r.rankId }) : "";
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.username || "?")}</td><td>${escapeHtml(rankName)}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
-      tbody.appendChild(tr);
-    });
-    if (!rows.length) tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_empty"))}</td></tr>`;
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_error"))}${escapeHtml(err.message)}</td></tr>`;
+    if (file.size > SAVEFILE_MAX_BYTES) throw new Error("too large");
+    const data = JSON.parse(await file.text());
+    const raw = data && typeof data === "object" && data.state ? data.state : data;
+    if (!raw || typeof raw !== "object" || !Array.isArray(raw.read) || !Array.isArray(raw.findings)) {
+      throw new Error("not a save file");
+    }
+    if (readLocalSave() && !window.confirm(t("savefile_confirm"))) return;
+    closeSaveFile();
+    startGame(window.I18N.getUiLang(), sanitizeImported(raw));
+  } catch {
+    $("#savefile-status").textContent = t("savefile_bad");
   }
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-$("#leaderboard-close").addEventListener("click", () => $("#leaderboard-modal").classList.add("hidden"));
-$("#leaderboard-btn").addEventListener("click", openLeaderboard);
-$("#logout-btn").addEventListener("click", async () => {
-  persist();
-  if (syncDirty) await runAutoSync();
-  if (currentUser) { try { await Auth.logout(); } catch { /* ignore */ } }
-  currentUser = null;
-  location.reload();
 });
 
 wireLangSwitch();

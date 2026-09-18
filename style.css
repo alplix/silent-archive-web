@@ -413,18 +413,6 @@ html, body {
   color: var(--green);
 }
 
-#sync-modal a { color: var(--cyan); }
-#sync-token {
-  width: 100%;
-  box-sizing: border-box;
-  background: #061006;
-  border: 1px solid var(--border);
-  color: var(--green);
-  padding: 8px 10px;
-  font-family: inherit;
-  font-size: 13px;
-}
-#sync-token:focus { outline: none; border-color: var(--green); }
 .modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .modal-actions button:not(.secondary) {
   background: var(--darkgreen);
@@ -521,3 +509,17 @@ html, body {
   }
   #sidebar.open { transform: translateX(0); }
 }
+
+.play-btn {
+  width: 100%;
+  background: var(--darkgreen);
+  color: #041004;
+  border: none;
+  padding: 14px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.play-btn:hover, .play-btn:focus { background: var(--green); outline: none; }
