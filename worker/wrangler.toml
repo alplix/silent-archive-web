@@ -1,0 +1,12 @@
+name = "silent-archive-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Sites allowed to call the API from a browser (comma separated).
+ALLOWED_ORIGINS = "https://alplix.github.io,http://localhost:8123,http://127.0.0.1:8123"
+
+# KV namespace holding one entry per player. `wrangler deploy` creates it on
+# first deploy when no id is given; for local dev it is simulated on disk.
+[[kv_namespaces]]
+binding = "SAVES"

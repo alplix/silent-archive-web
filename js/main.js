@@ -1,3 +1,5 @@
+import * as Cloud from "./cloud.js";
+
 const $ = (sel) => document.querySelector(sel);
 const screens = {
   boot: $("#boot-screen"), auth: $("#auth-screen"), game: $("#game-screen"),
@@ -623,6 +625,7 @@ async function handleLine(raw) {
   if (result.hostVerb === "quit") {
     printLine(E.T("ui", "bye"), "dim darkgreen");
     persist();
+    await flushSync();
     gameOver = true;
     inGame = false;
     $("#cmd-input").disabled = true;
@@ -687,6 +690,7 @@ function clearSave() {
 // server: the save file below is how progress moves between devices.
 function persist() {
   writeLocalSave(window.Engine.getState());
+  markSyncDirty();
 }
 
 async function reloadSave() {
@@ -779,6 +783,101 @@ $("#savefile-input").addEventListener("change", async (e) => {
   } catch {
     $("#savefile-status").textContent = t("savefile_bad");
   }
+});
+
+// ---------------------------------------------------------------------------
+// leaderboard + automatic upload. Purely an add-on: the game and its saves
+// are local, so if the server is ever unreachable nothing else changes.
+// Throttled on purpose (the free server tier allows ~1000 writes a day):
+// a burst of commands becomes one upload, plus a last push when the tab is
+// hidden or closed.
+// ---------------------------------------------------------------------------
+
+const SYNC_FIRST_DELAY_MS = 20000;
+const SYNC_MIN_GAP_MS = 180000;
+let syncTimer = null;
+let syncDirty = false;
+let lastSyncAt = 0;
+
+function markSyncDirty() {
+  if (!inGame) return;
+  syncDirty = true;
+  if (syncTimer) return;
+  const wait = Math.max(SYNC_FIRST_DELAY_MS, lastSyncAt + SYNC_MIN_GAP_MS - Date.now());
+  syncTimer = setTimeout(() => { syncTimer = null; runAutoSync(); }, wait);
+}
+
+async function runAutoSync({ keepalive = false } = {}) {
+  if (!syncDirty) return;
+  syncDirty = false;
+  try {
+    await Cloud.saveToCloud(window.Engine.getState(), { keepalive });
+    lastSyncAt = Date.now();
+  } catch (err) {
+    if (err && err.status === 400) {
+      console.warn("leaderboard upload was rejected as malformed", err); // our bug: don't hammer the server
+      return;
+    }
+    syncDirty = true; // network hiccup, rate limit...: try again after a full gap
+    if (!keepalive) { lastSyncAt = Date.now(); markSyncDirty(); }
+  }
+}
+
+async function flushSync() {
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  await runAutoSync();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") return;
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  runAutoSync({ keepalive: true });
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function renderLeaderboard() {
+  const t = window.I18N.t;
+  const tbody = document.querySelector("#leaderboard-table tbody");
+  tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_loading"))}</td></tr>`;
+  try {
+    const rows = await Cloud.fetchLeaderboard();
+    const E = window.Engine;
+    tbody.innerHTML = "";
+    rows.forEach((r, i) => {
+      const rankName = E.rankName(E.rankIndex(r.xp || 0));
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.name || "?")}</td><td>${escapeHtml(rankName)}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
+      tbody.appendChild(tr);
+    });
+    if (!rows.length) tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_empty"))}</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan='5'>${escapeHtml(t("lb_error"))}${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function openLeaderboard() {
+  $("#lb-name").value = Cloud.getName();
+  $("#leaderboard-modal").classList.remove("hidden");
+  renderLeaderboard();
+}
+
+function closeLeaderboard() {
+  $("#leaderboard-modal").classList.add("hidden");
+  const input = $("#cmd-input");
+  if (input && !input.disabled) input.focus();
+}
+
+$("#leaderboard-btn").addEventListener("click", openLeaderboard);
+$("#lb-close").addEventListener("click", closeLeaderboard);
+$("#lb-save-name").addEventListener("click", async () => {
+  Cloud.setName($("#lb-name").value);
+  $("#lb-name").value = Cloud.getName();
+  syncDirty = true;
+  await flushSync();
+  renderLeaderboard();
 });
 
 wireLangSwitch();

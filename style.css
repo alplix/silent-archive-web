@@ -523,3 +523,17 @@ html, body {
   border-radius: 3px;
 }
 .play-btn:hover, .play-btn:focus { background: var(--green); outline: none; }
+
+#lb-name {
+  width: 100%;
+  background: #061006;
+  border: 1px solid var(--border);
+  color: var(--green);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+#lb-name:focus { outline: none; border-color: var(--green); }
+.field { display: flex; flex-direction: column; gap: 4px; color: var(--darkgreen); margin-top: 12px; }
+
+#leaderboard-table { margin-bottom: 12px; }

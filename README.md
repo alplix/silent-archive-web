@@ -1,14 +1,17 @@
 # The Silent Archive — Web
 
 Browser-playable version of the terminal SCP investigation game, with
-rank/XP progression and automatic resume-where-you-left-off saves. The game
-and all content (565 records, 303 findings, four languages) are identical to
-the original Python/terminal version — this repo just re-implements the same
-engine to run client-side, reading the same data files unchanged.
+rank/XP progression, automatic resume-where-you-left-off saves and a
+leaderboard. The game and all content (565 records, 303 findings, four
+languages) are identical to the original Python/terminal version — this repo
+just re-implements the same engine to run client-side, reading the same data
+files unchanged.
 
-**This is a fully static site.** No server, no database, no accounts, no
-third-party service, nothing to configure. It is plain files on GitHub Pages,
-so it keeps working for as long as GitHub Pages does.
+**The game is a fully static site**: plain files on GitHub Pages, no server,
+no accounts, nothing for players to set up. The **leaderboard is a separate
+optional add-on** (a tiny Cloudflare Worker, see below). If it is ever
+unreachable, retired or full, only the leaderboard stops — the game and
+everyone's saved progress keep working, because those never depended on it.
 
 ---
 
@@ -38,15 +41,36 @@ python3 -m http.server 8000
   device or browser. It is optional and never needed for normal play. Loaded
   files are sanitized (only the game's known fields, with clamped values).
 
-### Why there is no account system or shared leaderboard
+## Leaderboard (optional add-on)
 
-A page on GitHub Pages can't write anything to a shared place on its own:
-GitHub doesn't let anonymous pages write to a repository (and a token
-embedded in the page would let anyone overwrite the whole repo, including the
-site), and a browser can't do a "Log in with GitHub" popup without a server.
-A shared leaderboard or cross-device accounts therefore always need either a
-server/service the owner runs, or a credential from every player. This project
-deliberately chooses neither, so saving is local plus the optional save file.
+Nothing to do for players: while they play, the page uploads their progress
+(best XP, findings, a name) in the background, throttled to at most one upload
+every 3 minutes plus a last one when the tab is hidden. The name defaults to
+a random `Auditor-XXXX` and can be changed in the leaderboard dialog. There is
+no login: the browser makes a random 128-bit key on first use and the server
+stores only its SHA-256, so nobody can write to someone else's entry.
+
+The server is [`worker/`](worker/): a Cloudflare Worker with one KV entry per
+player (no SQL). It validates every upload against the game's real limits and
+never stores anything but the game's known fields; the leaderboard is still
+honor-system because the game runs in the player's browser.
+
+Data shared with the server: the random key's hash, the display name, and the
+game-progress numbers. Nothing else.
+
+**Deploying your own copy** (free plan, no credit card):
+
+```bash
+cd worker
+npx wrangler login          # once; opens the browser to sign in / allow
+npx wrangler deploy         # creates the KV namespace on first deploy
+node smoke-test.mjs https://<your-worker>.workers.dev https://<you>.github.io
+```
+
+A new `workers.dev` address can take a few minutes before its certificate is
+ready. Then set `API_BASE` in `js/cloud.js` and the allowed site origins in
+`worker/wrangler.toml` (`ALLOWED_ORIGINS`). Free-plan limits worth knowing:
+KV allows about 1,000 writes/day, which is why uploads are throttled.
 
 ## GitHub Pages
 
@@ -63,10 +87,13 @@ js/languages.js           registry of available languages (add a language here)
 js/engine.js              a faithful JS port of scp.py;
                           reads manifest.json + dil/*.json unchanged
 js/i18n.js                site-chrome localization (start screen, top bar,
-                          tutorial, toasts, save-file dialog)
+                          tutorial, toasts, dialogs)
 js/sfx.js                 synthesized sound effects (Web Audio API)
 js/main.js                wires screens together, renders the terminal,
-                          autosave and the save file
+                          autosave, the save file and leaderboard upload
+js/cloud.js               leaderboard client (the only file that talks to
+                          the Worker)
+worker/                   the optional leaderboard server (Cloudflare Worker)
 data/manifest.json        unchanged copy from the original Python project
 data/dil/en.json          unchanged copies from the original Python project
 data/dil/tr.json
