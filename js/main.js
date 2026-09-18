@@ -33,13 +33,13 @@ function wireLangSwitch() {
     sel.innerHTML = meta
       .map((m) => `<option value="${m.code}">${m.label}</option>`)
       .join("");
-    sel.addEventListener("change", () => {
+    sel.addEventListener("change", async () => {
       const code = sel.value;
       window.I18N.setUiLang(code);
       if (inGame) {
         const E = window.Engine;
         const state = E.getState();
-        if (state.lang !== code && E.LANGS[code]) {
+        if (state.lang !== code && await E.ensureLang(code)) {
           state.lang = code;
           updatePromptTag();
           persist();
@@ -56,7 +56,7 @@ function wireLangSwitch() {
 
 async function boot() {
   try {
-    await window.Engine.boot("data");
+    await window.Engine.boot("data", { langs: [window.I18N.getUiLang()] });
   } catch (err) {
     document.querySelector("#boot-screen p").textContent =
       "Failed to load game data: " + err.message;
@@ -96,7 +96,7 @@ function wireAuthScreen() {
 async function startGame(langCode, restored = null) {
   gameOver = false;
   const E = window.Engine;
-  if (!E.LANGS[langCode]) langCode = E.BASE_LANG;
+  if (!(await E.ensureLang(langCode))) langCode = E.BASE_LANG;
 
   // This browser's save is written after every command, so it is always the
   // freshest. A save file the player just loaded beats it, on purpose.
@@ -664,6 +664,20 @@ async function handleLine(raw) {
   const before = snapshot(E.getState());
   const result = E.runCommand(raw);
   if (!result) return;
+
+  if (result.loadLang) {
+    // `lang xx` for a language that hasn't been downloaded yet
+    if (await E.ensureLang(result.loadLang)) {
+      E.getState().lang = result.loadLang;
+      window.I18N.setUiLang(result.loadLang);
+      printLine(E.T("ui", "lang_switched"), "cyan");
+      persist();
+    } else {
+      printLine(E.T("ui", "lang_bad").replace("{x}", result.loadLang), "amber");
+    }
+    updatePromptTag();
+    return;
+  }
 
   if (result.hostVerb === "save") {
     persist();

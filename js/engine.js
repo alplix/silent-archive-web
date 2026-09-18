@@ -22,7 +22,9 @@ const Engine = (() => {
   let RANKS = null;
   let CROSS_LIST = [];   // [{a, b, finding}] in manifest order
   let CROSS_MAP = null;   // Map: "a|b" (sorted) -> finding id
-  let LANGS = null;       // {code: data}
+  let LANGS = null;       // {code: data} for the languages loaded so far
+  let REGISTRY = [];      // every language the site offers (js/languages.js)
+  let DATA_BASE = "data";
   let BASE_LANG = "en";
   let COMMANDS = null;    // folded word -> canonical verb
 
@@ -56,7 +58,7 @@ const Engine = (() => {
     return res.json();
   }
 
-  async function boot(dataBase) {
+  async function boot(dataBase, opts = {}) {
     M = await fetchJson(dataBase + "/manifest.json");
     RECORDS = M.records;
     RECORD_ORDER = M.record_order;
@@ -75,31 +77,50 @@ const Engine = (() => {
       CROSS_MAP.set(key, c.finding);
     }
 
-    const registry = (typeof window !== "undefined" && window.LANGUAGE_META) || [
+    // Language files are large (~2.5 MB each), so only English (the fallback)
+    // and the requested language(s) are fetched up front; others load on demand.
+    REGISTRY = (typeof window !== "undefined" && window.LANGUAGE_META) || [
       { code: "en" }, { code: "tr" },
     ];
-    const results = await Promise.allSettled(
-      registry.map((entry) => fetchJson(dataBase + "/dil/" + entry.code + ".json"))
-    );
+    DATA_BASE = dataBase;
     LANGS = {};
-    results.forEach((res, i) => {
-      if (res.status === "fulfilled") {
-        const data = res.value;
-        const code = (data.meta && data.meta.code) || registry[i].code;
-        LANGS[code] = data;
-      } else {
-        console.warn("Failed to load language data for", registry[i].code, res.reason);
-      }
-    });
-    BASE_LANG = LANGS.en ? "en" : Object.keys(LANGS).sort()[0];
-
     COMMANDS = {};
-    for (const data of Object.values(LANGS)) {
-      for (const [word, canonical] of Object.entries(data.commands || {})) {
-        COMMANDS[fold(word)] = canonical;
-      }
-    }
+    const wanted = new Set(["en", ...(opts.langs || [])]);
+    await Promise.all([...wanted].map((code) => ensureLang(code)));
+    if (!LANGS.en) throw new Error("Could not load the base language (en).");
+    BASE_LANG = "en";
   }
+
+  const LANG_LOADING = {};
+
+  // Loads data/dil/<code>.json (and its fallback chain) once. Resolves true if
+  // the language is available afterwards.
+  async function ensureLang(code) {
+    code = fold(code);
+    if (LANGS[code]) return true;
+    if (!REGISTRY.some((r) => r.code === code)) return false;
+    if (!LANG_LOADING[code]) {
+      LANG_LOADING[code] = (async () => {
+        try {
+          const data = await fetchJson(DATA_BASE + "/dil/" + code + ".json");
+          const fb = data.meta && data.meta.fallback;
+          if (fb && fb !== code) await ensureLang(fb);
+          LANGS[code] = data;
+          for (const [word, canonical] of Object.entries(data.commands || {})) {
+            COMMANDS[fold(word)] = canonical;
+          }
+          return true;
+        } catch (err) {
+          console.warn("Failed to load language data for", code, err);
+          return false;
+        } finally {
+          delete LANG_LOADING[code];
+        }
+      })();
+    }
+    return LANG_LOADING[code];
+  }
+
 
   function langChain(code) {
     const seen = new Set();
@@ -686,16 +707,16 @@ const Engine = (() => {
       lines.push({ text: "=".repeat(72), cls: "darkgreen" });
       lines.push({ text: T("ui", "lang_title"), cls: "bold white" });
       lines.push({ text: "=".repeat(72), cls: "darkgreen" });
-      for (const code of Object.keys(LANGS).sort()) {
-        const meta = LANGS[code].meta || {};
-        const mark = code === STATE.lang ? "  <<" : "";
-        lines.push({ text: `  ${code.padEnd(8)} ${(meta.name || code).padEnd(26)} ${meta.coverage || ""}${mark}`, cls: "" });
+      for (const entry of REGISTRY) {
+        const mark = entry.code === STATE.lang ? "  <<" : "";
+        lines.push({ text: `  ${entry.code.padEnd(8)} ${(entry.label || entry.code).padEnd(26)}${mark}`, cls: "" });
       }
       lines.push({ text: "-".repeat(72), cls: "darkgreen" });
       lines.push({ text: T("ui", "lang_hint"), cls: "dim darkgreen" });
       return { lines };
     }
     const code = fold(args[0]);
+    if (!LANGS[code] && REGISTRY.some((r) => r.code === code)) return { lines, loadLang: code }; // host loads it, then switches
     if (!LANGS[code]) { lines.push({ text: T("ui", "lang_bad").replace("{x}", args[0]), cls: "amber" }); return { lines }; }
     STATE.lang = code;
     lines.push({ text: T("ui", "lang_switched"), cls: "cyan" });
@@ -719,7 +740,7 @@ const Engine = (() => {
     for (const l of T("ui", "about_lines", { default: [] })) lines.push({ text: "  " + l, cls: "" });
     lines.push({ text: "-".repeat(72), cls: "darkgreen" });
     lines.push({
-      text: `  ${Object.keys(RECORDS).length} ${T("ui", "ab_records")} / ${FINDING_ORDER.length} ${T("ui", "ab_findings")} / ${ENDING_DEFS.length} ${T("ui", "ab_endings")} / ${Object.keys(LANGS).length} ${T("ui", "ab_languages")}`,
+      text: `  ${Object.keys(RECORDS).length} ${T("ui", "ab_records")} / ${FINDING_ORDER.length} ${T("ui", "ab_findings")} / ${ENDING_DEFS.length} ${T("ui", "ab_endings")} / ${REGISTRY.length} ${T("ui", "ab_languages")}`,
       cls: "dim darkgreen",
     });
     lines.push({ text: "=".repeat(72), cls: "darkgreen" });
@@ -869,7 +890,7 @@ const Engine = (() => {
   }
 
   return {
-    boot, T, fold, newState, getState, setState,
+    boot, ensureLang, T, fold, newState, getState, setState,
     runCommand, isYes, prompt, loadSanitizedState,
     accessible, accessibleRecords, readyPairs,
     get RECORDS() { return RECORDS; },
