@@ -1,13 +1,53 @@
+/* Themes: everything is coloured through these variables. --green is the main
+   text colour (the name is historical), --darkgreen the muted one. The
+   default "archive" theme is deliberately multi-hued and low-glare. */
 :root {
-  --bg: #0a0f0a;
-  --green: #33ff66;
-  --darkgreen: #1f8f3f;
-  --amber: #ffb300;
-  --red: #ff5555;
-  --cyan: #55e6ff;
-  --white: #eafff0;
-  --panel-bg: #0e160e;
-  --border: #1f8f3f;
+  --bg: #0b0f14;
+  --panel-bg: #121a23;
+  --input-bg: #0a0e13;
+  --meter-bg: #16212c;
+  --cyan-bg: #10222d;
+  --border: #2b3b4a;
+  --green: #d3dde0;
+  --darkgreen: #7f96a3;
+  --accent: #4dd6b4;
+  --on-accent: #05110d;
+  --amber: #ffb454;
+  --red: #ff6b6b;
+  --cyan: #6cd5ff;
+  --violet: #b79cff;
+  --ok: #7ee787;
+  --white: #f4f8fa;
+  --tint: rgba(77, 214, 180, 0.10);
+  --scan: rgba(255, 255, 255, 0.03);
+}
+:root[data-theme="terminal"] {
+  --bg: #0a0f0a; --panel-bg: #0e160e; --input-bg: var(--input-bg); --meter-bg: var(--meter-bg);
+  --cyan-bg: var(--cyan-bg); --border: #1f8f3f; --green: #33ff66; --darkgreen: #1f8f3f;
+  --accent: #1f8f3f; --on-accent: var(--on-accent); --amber: #ffb300; --red: #ff5555;
+  --cyan: #55e6ff; --violet: #d59cff; --ok: #33ff66; --white: #eafff0;
+  --tint: var(--tint); --scan: rgba(51, 255, 102, 0.035);
+}
+:root[data-theme="amber"] {
+  --bg: #120c04; --panel-bg: #1a1206; --input-bg: #0e0904; --meter-bg: #241806;
+  --cyan-bg: #1e1406; --border: #6b4a12; --green: #ffb84d; --darkgreen: #a8761f;
+  --accent: #e39a1b; --on-accent: #140b00; --amber: #ffd27a; --red: #ff7a5c;
+  --cyan: #ffe0a3; --violet: #ff9d6e; --ok: #d9c24a; --white: #fff1d6;
+  --tint: rgba(227, 154, 27, 0.10); --scan: rgba(255, 184, 77, 0.04);
+}
+:root[data-theme="ice"] {
+  --bg: #060c14; --panel-bg: #0b1622; --input-bg: #050a11; --meter-bg: #0f1f30;
+  --cyan-bg: #0b1f30; --border: #234868; --green: #cfe6ff; --darkgreen: #6f93b5;
+  --accent: #4fb4ff; --on-accent: #03101c; --amber: #ffcf7a; --red: #ff7a8c;
+  --cyan: #7fe4ff; --violet: #a9a2ff; --ok: #79e6c1; --white: #f2f9ff;
+  --tint: rgba(79, 180, 255, 0.10); --scan: rgba(160, 210, 255, 0.04);
+}
+:root[data-theme="paper"] {
+  --bg: #f1ede3; --panel-bg: #e8e3d6; --input-bg: #fbf9f3; --meter-bg: #d9d3c3;
+  --cyan-bg: #dfe9ec; --border: #b8b09c; --green: #27313b; --darkgreen: #66707a;
+  --accent: #0d7a78; --on-accent: #ffffff; --amber: #9a5b00; --red: #b3261e;
+  --cyan: #0a5f8a; --violet: #5b3fb0; --ok: #1e7a34; --white: #0a0f14;
+  --tint: rgba(13, 122, 120, 0.10); --scan: rgba(0, 0, 0, 0.02);
 }
 
 * { box-sizing: border-box; }
@@ -94,12 +134,12 @@ html, body {
   font-family: inherit;
   font-size: 13px;
 }
-.tab.active { color: var(--green); border-bottom: 2px solid var(--green); }
+.tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 
 .auth-form { display: flex; flex-direction: column; gap: 10px; }
 .auth-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--darkgreen); }
 .auth-form input {
-  background: #061006;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--green);
   padding: 8px;
@@ -109,8 +149,8 @@ html, body {
 }
 .auth-form input:focus { outline: none; border-color: var(--green); }
 .auth-form button, .secondary {
-  background: var(--darkgreen);
-  color: #041004;
+  background: var(--accent);
+  color: var(--on-accent);
   border: none;
   padding: 10px;
   font-family: inherit;
@@ -205,7 +245,7 @@ html, body {
 .stat-block { display: flex; flex-direction: column; gap: 3px; }
 .meter {
   height: 6px;
-  background: #0a1c0e;
+  background: var(--meter-bg);
   border: 1px solid var(--border);
   border-radius: 3px;
   overflow: hidden;
@@ -213,7 +253,7 @@ html, body {
 .meter-fill {
   height: 100%;
   width: 0%;
-  background: var(--green);
+  background: var(--accent);
   transition: width 0.4s ease;
 }
 .meter-fill.danger { background: var(--red); animation: pulse-danger 1s infinite; }
@@ -236,7 +276,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #061a1e;
+  background: var(--cyan-bg);
   padding: 3px 6px;
   border-radius: 3px;
   color: var(--white);
@@ -244,7 +284,7 @@ html, body {
 .cross-pick button { background: none; border: none; color: var(--red); cursor: pointer; font-family: inherit; }
 #cross-tray-go {
   background: var(--cyan);
-  color: #041004;
+  color: var(--on-accent);
   border: none;
   padding: 6px;
   font-family: inherit;
@@ -264,11 +304,11 @@ html, body {
   padding: 5px 8px;
   cursor: pointer;
 }
-.tabs.mini .rb-tab.active { color: var(--green); border-bottom: 2px solid var(--green); }
+.tabs.mini .rb-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 
 #rb-search {
   width: 100%;
-  background: #061006;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--green);
   padding: 5px 7px;
@@ -279,7 +319,7 @@ html, body {
 }
 #rb-search:focus { outline: none; border-color: var(--green); }
 
-.meter-fill.day { background: var(--darkgreen); }
+.meter-fill.day { background: var(--violet); }
 .meter-fill.day.urgent { background: var(--amber); animation: pulse-danger 1.2s infinite; }
 
 .finding-card {
@@ -321,11 +361,11 @@ html, body {
   font-size: 10px;
   color: var(--cyan);
 }
-.rb-row.locked .rb-check { border-color: #123; }
-.rb-check.picked { background: var(--cyan); color: #041004; border-color: var(--cyan); }
+.rb-row.locked .rb-check { border-color: var(--border); }
+.rb-check.picked { background: var(--cyan); color: var(--on-accent); border-color: var(--cyan); }
 .rb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--green); }
-.rb-row.read .rb-name { color: var(--darkgreen); }
-.rb-tag { font-size: 9px; color: var(--darkgreen); }
+.rb-row.read .rb-name { color: var(--darkgreen); text-decoration: line-through; text-decoration-color: var(--border); }
+.rb-tag { font-size: 9px; color: var(--violet); }
 
 #main-pane {
   flex: 1;
@@ -397,7 +437,7 @@ html, body {
 #leaderboard-table th, #leaderboard-table td {
   text-align: left;
   padding: 6px 8px;
-  border-bottom: 1px solid #123a1a;
+  border-bottom: 1px solid var(--border);
 }
 #leaderboard-table th { color: var(--darkgreen); font-weight: normal; }
 #tutorial-body { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 4px 0; }
@@ -415,8 +455,8 @@ html, body {
 
 .modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .modal-actions button:not(.secondary) {
-  background: var(--darkgreen);
-  color: #041004;
+  background: var(--accent);
+  color: var(--on-accent);
   border: none;
   padding: 9px 12px;
   font-family: inherit;
@@ -427,8 +467,8 @@ html, body {
 
 #tutorial-close, #leaderboard-close {
   margin-top: 16px;
-  background: var(--darkgreen);
-  color: #041004;
+  background: var(--accent);
+  color: var(--on-accent);
   border: none;
   padding: 8px 16px;
   font-family: inherit;
@@ -512,8 +552,8 @@ html, body {
 
 .play-btn {
   width: 100%;
-  background: var(--darkgreen);
-  color: #041004;
+  background: var(--accent);
+  color: var(--on-accent);
   border: none;
   padding: 14px;
   font-family: inherit;
@@ -526,7 +566,7 @@ html, body {
 
 #lb-name, #acct-user, #acct-pass {
   width: 100%;
-  background: #061006;
+  background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--green);
   padding: 8px 10px;
@@ -542,4 +582,67 @@ html, body {
 .signin-btn { display: block; width: 100%; margin-top: 12px; padding: 8px; font-size: 13px; text-align: center; }
 #acct-signed-as { color: var(--white); margin: 0 0 8px; }
 #account-form .modal-actions { margin-top: 14px; }
-#leaderboard-table tr.me td { color: var(--white); font-weight: bold; background: rgba(51, 255, 102, 0.08); }
+#leaderboard-table tr.me td { color: var(--white); font-weight: bold; background: var(--tint); }
+
+/* ---- terminal decoration: colour the things worth noticing ---- */
+.tok-scp { color: var(--cyan); font-weight: bold; }
+.tok-redact { background: #000; color: #000; box-shadow: 0 0 0 1px var(--border); border-radius: 2px; padding: 0 2px; user-select: none; transition: color 0.15s; }
+.tok-redact:hover, .tok-redact.reveal { color: var(--red); }
+.tok-safe { color: var(--ok); font-weight: bold; }
+.tok-euclid { color: var(--amber); font-weight: bold; }
+.tok-keter { color: var(--red); font-weight: bold; }
+.tok-thaumiel { color: var(--violet); font-weight: bold; }
+.tok-num { color: var(--amber); }
+.tok-quote { color: var(--violet); }
+.tok-key { color: var(--amber); font-weight: bold; }
+
+/* ---- dread: the screen gets subtly wrong as contamination rises ---- */
+#game-screen::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 15; pointer-events: none; opacity: 0;
+  background: repeating-linear-gradient(to bottom, var(--scan) 0, var(--scan) 1px, transparent 1px, transparent 3px);
+  transition: opacity 1.2s ease;
+}
+body[data-dread="1"] #game-screen::before { opacity: 0.6; }
+body[data-dread="2"] #game-screen::before, body[data-dread="3"] #game-screen::before { opacity: 1; }
+body[data-dread="2"] #terminal, body[data-dread="3"] #terminal { text-shadow: 0.7px 0 rgba(255, 70, 70, 0.35), -0.7px 0 rgba(70, 200, 255, 0.3); }
+body[data-dread="3"] #terminal .line:nth-last-child(-n+6) { animation: dread-jitter 4s steps(1) infinite; }
+@keyframes dread-jitter {
+  0%, 92%, 100% { transform: none; }
+  93% { transform: translateX(1.5px); }
+  95% { transform: translateX(-2px); }
+  97% { transform: translateX(1px); }
+}
+
+/* ---- momentary anomalies (see js/atmosphere.js) ---- */
+body.anomaly-red {
+  --green: #ff5a5a; --darkgreen: #a12a2a; --accent: #ff5a5a; --cyan: #ff8a8a; --white: #ffdcdc;
+  --border: #6b1d1d; --amber: #ff8a5a; --violet: #ff6a9a; --ok: #ff8a8a;
+}
+body.anomaly-invert { filter: invert(1) hue-rotate(180deg); }
+body.anomaly-mono { filter: grayscale(1) contrast(1.25); }
+body.anomaly-sick { --green: #b6d94a; --darkgreen: #6d8a1e; --accent: #b6d94a; --cyan: #d8e86a; --border: #5a6b1e; }
+.glitching { text-shadow: 2px 0 rgba(255, 0, 60, 0.75), -2px 0 rgba(0, 220, 255, 0.75) !important; }
+#terminal.shake { animation: term-shake 0.35s steps(2) 1; }
+@keyframes term-shake {
+  0% { transform: translate(0, 0); } 25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(3px, -1px); } 75% { transform: translate(-2px, 0); } 100% { transform: translate(0, 0); }
+}
+.line.phantom { color: var(--red); font-style: italic; opacity: 0; animation: phantom-in 0.5s ease forwards; }
+.line.phantom.gone { animation: phantom-out 0.9s ease forwards; }
+@keyframes phantom-in { to { opacity: 0.9; } }
+@keyframes phantom-out { from { opacity: 0.9; } to { opacity: 0; } }
+#blackout {
+  position: fixed; inset: 0; z-index: 90; background: #000; color: var(--red);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 14px; letter-spacing: 2px; opacity: 0; pointer-events: none; transition: opacity 0.12s;
+}
+#blackout.on { opacity: 1; pointer-events: all; }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-dread="3"] #terminal .line { animation: none !important; }
+  #terminal.shake { animation: none; }
+}
+body.fx-off #game-screen::before { display: none; }
+body.fx-off #terminal { text-shadow: none !important; }
+body.fx-off #terminal .line { animation: none !important; }

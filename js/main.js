@@ -126,6 +126,8 @@ async function startGame(langCode, restored = null) {
   wireSidebar();
   wireInput();
   $("#cmd-input").focus();
+  window.Atmosphere.init({ getName: () => Cloud.getName(), getLang: () => E.getState().lang });
+  window.Atmosphere.start();
 
   maybeShowTutorial();
 }
@@ -154,6 +156,7 @@ function renderDashboard() {
   contamMeter.className = "meter-fill" + (c >= 70 ? " danger" : c >= 40 ? " warn" : "");
 
   const vignette = $("#tension-vignette");
+  window.Atmosphere.setContam(c);
   vignette.classList.toggle("on", c >= 55);
   vignette.classList.toggle("pulse", c >= 80);
 
@@ -457,7 +460,50 @@ function printLine(text, cls = "") {
   const div = document.createElement("div");
   div.className = "line " + cls;
   div.textContent = text;
+  decorate(div);
   $("#terminal").appendChild(div);
+}
+
+// ---------------------------------------------------------------------------
+// decoration: colour the things worth noticing inside a line (SCP numbers,
+// object classes, redactions, percentages, quoted speech). Purely visual: the
+// text itself is never changed.
+// ---------------------------------------------------------------------------
+
+const TOKEN_RE = new RegExp([
+  "(?<scp>\\bSCP-\\d{3,4}(?:-[A-Z]{1,3})?\\b)",
+  "(?<redact>\\[[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ _-]{2,30}\\])",
+  "(?<cls>\\b(?:Safe|Euclid|Keter|Thaumiel|Apollyon)\\b)",
+  "(?<key>>>[^\\n]{3,80}<<)",
+  "(?<num>\\b\\d+(?:[.,]\\d+)?\\s?%)",
+  "(?<quote>\u201c[^\u201d]{3,200}\u201d|\"[^\"\\n]{3,200}\")",
+].join("|"), "g");
+
+function decorate(el) {
+  const text = el.textContent;
+  if (text.length < 4) return;
+  TOKEN_RE.lastIndex = 0;
+  let last = 0, m, frag = null;
+  while ((m = TOKEN_RE.exec(text))) {
+    if (!frag) frag = document.createDocumentFragment();
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const g = m.groups;
+    let cls = "tok-scp";
+    if (g.redact) cls = "tok-redact";
+    else if (g.cls) cls = "tok-" + m[0].toLowerCase().replace("apollyon", "keter");
+    else if (g.key) cls = "tok-key";
+    else if (g.num) cls = "tok-num";
+    else if (g.quote) cls = "tok-quote";
+    const span = document.createElement("span");
+    span.className = cls;
+    span.textContent = m[0];
+    frag.appendChild(span);
+    last = m.index + m[0].length;
+  }
+  if (!frag) return;
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  el.textContent = "";
+  el.appendChild(frag);
 }
 
 // Typewriter reveal for atmospheric lines (record/finding/mail bodies, day
@@ -478,15 +524,17 @@ function typeLine(text, cls, speedHint) {
     $("#terminal").appendChild(div);
     if (!text) { resolve(); return; }
     skipRequested = false;
+    div.dataset.typing = "1";
+    const finish = () => { div.textContent = text; decorate(div); delete div.dataset.typing; scrollDown(); resolve(); };
     const interval = speedHint || 12;
     const chunk = text.length <= 90 ? 1 : Math.max(1, Math.round(text.length / 150));
     let i = 0;
     function step() {
-      if (skipRequested) { div.textContent = text; scrollDown(); resolve(); return; }
+      if (skipRequested) { finish(); return; }
       i = Math.min(text.length, i + chunk);
       div.textContent = text.slice(0, i);
       scrollDown();
-      if (i >= text.length) { resolve(); return; }
+      if (i >= text.length) { finish(); return; }
       setTimeout(step, interval);
     }
     step();
@@ -569,6 +617,7 @@ function playCueFor(before, s) {
   const E = window.Engine;
   const t = window.I18N.t;
   const after = snapshot(s);
+  window.Atmosphere.crossed(before.contam, after.contam);
   if (after.findingsCount > before.findingsCount) { window.SFX.finding(); showToast(t("toast_finding")); return; }
   if (after.rankSeen > before.rankSeen) { window.SFX.rankUp(); showToast(t("toast_rankup") + ": " + E.rankName(after.rankSeen)); return; }
   if (after.contam >= 70 && before.contam < 70) { window.SFX.danger(); showToast(t("toast_danger"), "danger"); return; }
@@ -786,6 +835,43 @@ $("#savefile-input").addEventListener("change", async (e) => {
   } catch {
     $("#savefile-status").textContent = t("savefile_bad");
   }
+});
+
+// ---------------------------------------------------------------------------
+// themes + effects toggle
+// ---------------------------------------------------------------------------
+
+const THEMES = ["archive", "terminal", "amber", "ice", "paper"];
+const THEME_KEY = "silent-archive-theme";
+
+function applyTheme(name) {
+  if (!THEMES.includes(name)) name = THEMES[0];
+  document.documentElement.dataset.theme = name;
+  try { localStorage.setItem(THEME_KEY, name); } catch { /* ignore */ }
+  return name;
+}
+
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
+  applyTheme(saved);
+})();
+
+$("#theme-btn").addEventListener("click", () => {
+  const next = THEMES[(THEMES.indexOf(document.documentElement.dataset.theme) + 1) % THEMES.length];
+  applyTheme(next);
+  showToast(window.I18N.t("theme_" + next));
+});
+
+function paintFxButton() {
+  $("#fx-btn").style.opacity = window.Atmosphere.isEnabled() ? "1" : "0.4";
+}
+paintFxButton();
+$("#fx-btn").addEventListener("click", () => {
+  const on = !window.Atmosphere.isEnabled();
+  window.Atmosphere.setEnabled(on);
+  paintFxButton();
+  showToast(window.I18N.t(on ? "fx_on" : "fx_off"));
 });
 
 // ---------------------------------------------------------------------------

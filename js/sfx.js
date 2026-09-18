@@ -64,6 +64,27 @@ const SFX = {
   ending() {
     tone(300, 0.3, { type: "sine", gain: 0.05, sweepTo: 120 });
   },
+  // --- atmosphere ---
+  sub() { tone(48, 1.6, { type: "sine", gain: 0.09 }); tone(51, 1.6, { type: "sine", gain: 0.07 }); },
+  thump() { tone(70, 0.18, { type: "sine", gain: 0.1, sweepTo: 40 }); },
+  heartbeat() {
+    for (const d of [0, 0.28, 1.05, 1.33]) tone(62, 0.16, { type: "sine", gain: 0.11, delay: d, sweepTo: 38 });
+  },
+  staticBurst() {
+    if (muted) return;
+    const c = ensureCtx();
+    if (!c) return;
+    const len = Math.floor(c.sampleRate * 0.5);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = c.createBufferSource();
+    const amp = c.createGain();
+    amp.gain.value = 0.05;
+    src.buffer = buf;
+    src.connect(amp).connect(c.destination);
+    src.start();
+  },
 };
 
 window.SFX = SFX;
