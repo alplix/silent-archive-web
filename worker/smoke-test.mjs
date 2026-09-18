@@ -68,5 +68,44 @@ const lb = r.status === 200 ? await r.json() : null;
 check("GET leaderboard -> 200 with rows[]", lb && Array.isArray(lb.rows), String(r.status));
 check("leaderboard rows expose no key/hash", lb && lb.rows.every((x) => Object.keys(x).sort().join() === "clearance,findings,name,updatedAt,xp"));
 
+// --- accounts -------------------------------------------------------------
+const hex16 = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const acctName = "smoke" + hex16().slice(0, 8);
+const acctKey = hex16();
+const wrongKey = hex16();
+
+r = await call("/api/account", "POST", { auth: acctKey, body: { name: acctName, mode: "login" } });
+check("login to a name nobody registered -> 404", r.status === 404, String(r.status));
+
+r = await call("/api/account", "POST", { auth: acctKey, body: { name: acctName, mode: "register" } });
+check("register a new name -> 200", r.status === 200, String(r.status));
+
+r = await call("/api/account", "POST", { auth: wrongKey, body: { name: acctName.toUpperCase(), mode: "register" } });
+check("registering the same name again (any case) -> 409", r.status === 409, String(r.status));
+
+r = await call("/api/account", "POST", { auth: acctKey, body: { name: acctName.toUpperCase(), mode: "login" } });
+check("login with the right key (name case-insensitive) -> 200", r.status === 200, String(r.status));
+
+r = await call("/api/account", "POST", { auth: wrongKey, body: { name: acctName, mode: "login" } });
+check("login with the wrong key -> 401", r.status === 401, String(r.status));
+
+r = await call("/api/account", "POST", { auth: acctKey, body: { name: acctName, mode: "nope" } });
+check("unknown mode -> 400", r.status === 400, String(r.status));
+
+r = await call("/api/save", "GET", { auth: acctKey });
+check("a fresh account has no save yet -> 404", r.status === 404, String(r.status));
+
+r = await call("/api/save", "PUT", { auth: acctKey, body: { name: "whatever", state: state({ xp: 40 }) } });
+check("account PUT -> 200", r.status === 200, String(r.status));
+r = await call("/api/save", "GET", { auth: acctKey });
+const acct = r.status === 200 ? await r.json() : null;
+check("an account keeps its registered name and is flagged as one", acct && acct.name === acctName && acct.account === true, JSON.stringify(acct && acct.name));
+
+r = await call("/api/save", "PUT", { auth: wrongKey, body: { name: acctName, state: state() } });
+check("a guest cannot upload under a claimed name -> 409", r.status === 409, String(r.status));
+
+console.log(`
+(account test name: ${acctName} - delete KV keys n:${acctName.toLowerCase()} if you want it gone)`);
+
 console.log(failed ? `\n${failed} check(s) FAILED` : "\nall checks passed");
 process.exit(failed ? 1 : 0);

@@ -31,6 +31,7 @@
   |___/\___|_|_|  |_|\_|___| |_|</pre>
   <div class="panel">
     <button id="play-btn" class="play-btn" data-i18n="btn_play">...</button>
+    <button id="signin-btn" class="link-btn signin-btn" data-i18n="btn_signin">...</button>
   </div>
 </div>
 
@@ -41,6 +42,7 @@
     </span>
     <span class="topbar-actions">
       <button id="sfx-toggle" class="link-btn">🔊</button>
+      <button id="account-btn" class="link-btn" data-i18n="acct_btn">…</button>
       <button id="leaderboard-btn" class="link-btn" data-i18n="nav_leaderboard">…</button>
       <button id="savefile-btn" class="link-btn" data-i18n="savefile_btn">…</button>
       <button id="tutorial-btn" class="link-btn" data-i18n="tut_button">…</button>
@@ -110,6 +112,38 @@
     <p id="savefile-status" class="err"></p>
     <div class="modal-actions">
       <button id="savefile-close" class="secondary" data-i18n="btn_close">…</button>
+    </div>
+  </div>
+</div>
+
+<div id="account-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2 data-i18n="acct_title">…</h2>
+    <div id="account-guest">
+      <p class="small" data-i18n="acct_help">…</p>
+      <form id="account-form" autocomplete="on">
+        <label class="field"><span class="small" data-i18n="acct_user">…</span>
+          <input id="acct-user" type="text" maxlength="24" autocomplete="username" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field"><span class="small" data-i18n="acct_pass">…</span>
+          <input id="acct-pass" type="password" maxlength="128" autocomplete="current-password">
+        </label>
+        <div class="modal-actions">
+          <button id="acct-login" type="submit" data-i18n="acct_login">…</button>
+          <button id="acct-register" type="button" class="secondary" data-i18n="acct_register">…</button>
+        </div>
+      </form>
+    </div>
+    <div id="account-user" class="hidden">
+      <p id="acct-signed-as"></p>
+      <p class="small" data-i18n="acct_name_locked">…</p>
+      <div class="modal-actions">
+        <button id="acct-logout" class="secondary" data-i18n="acct_logout">…</button>
+      </div>
+    </div>
+    <p id="acct-status" class="err"></p>
+    <div class="modal-actions">
+      <button id="acct-close" class="secondary" data-i18n="btn_close">…</button>
     </div>
   </div>
 </div>

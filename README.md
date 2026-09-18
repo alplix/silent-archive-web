@@ -7,11 +7,12 @@ languages) are identical to the original Python/terminal version — this repo
 just re-implements the same engine to run client-side, reading the same data
 files unchanged.
 
-**The game is a fully static site**: plain files on GitHub Pages, no server,
-no accounts, nothing for players to set up. The **leaderboard is a separate
-optional add-on** (a tiny Cloudflare Worker, see below). If it is ever
-unreachable, retired or full, only the leaderboard stops — the game and
-everyone's saved progress keep working, because those never depended on it.
+**The game is a fully static site**: plain files on GitHub Pages, nothing for
+players to set up. **Accounts and the leaderboard are a separate optional
+add-on** (a tiny Cloudflare Worker, see below). If it is ever unreachable,
+retired or full, only those stop — the game and everyone's saved progress keep
+working, because they never depended on it. Players can also just play as a
+guest.
 
 ---
 
@@ -41,21 +42,33 @@ python3 -m http.server 8000
   device or browser. It is optional and never needed for normal play. Loaded
   files are sanitized (only the game's known fields, with clamped values).
 
-## Leaderboard (optional add-on)
+## Accounts and leaderboard (optional add-on)
 
-Nothing to do for players: while they play, the page uploads their progress
-(best XP, findings, a name) in the background, throttled to at most one upload
-every 3 minutes plus a last one when the tab is hidden. The name defaults to
-a random `Auditor-XXXX` and can be changed in the leaderboard dialog. There is
-no login: the browser makes a random 128-bit key on first use and the server
-stores only its SHA-256, so nobody can write to someone else's entry.
+Nothing is required of players: while they play, the page uploads their
+progress (best XP, findings, a name) in the background, throttled to at most
+one upload every 3 minutes plus a last one when the tab is hidden.
+
+- **Guest** (default): the browser makes a random 128-bit key on first use and
+  the server stores only its SHA-256, so nobody can write to someone else's
+  entry. The name defaults to a random `Auditor-XXXX` and can be changed in
+  the leaderboard dialog.
+- **Account** (optional, username + password): the key is derived from them
+  in the browser with PBKDF2 (200,000 rounds), so the password never leaves
+  the device and the same credentials restore the same progress on any device.
+  The username is unique (case-insensitive) and becomes the leaderboard name.
+  There is no e-mail, so there is **no password recovery**. On sign-in, the
+  save with more turns played wins (the player is asked if it would replace
+  different progress on the device).
+
+The player's name (account or guest) also appears in the "Welcome,
+Researcher …" line of the intro.
 
 The server is [`worker/`](worker/): a Cloudflare Worker with one KV entry per
 player (no SQL). It validates every upload against the game's real limits and
 never stores anything but the game's known fields; the leaderboard is still
 honor-system because the game runs in the player's browser.
 
-Data shared with the server: the random key's hash, the display name, and the
+Data shared with the server: the key's hash, the display name, and the
 game-progress numbers. Nothing else.
 
 **Deploying your own copy** (free plan, no credit card):
@@ -91,9 +104,10 @@ js/i18n.js                site-chrome localization (start screen, top bar,
 js/sfx.js                 synthesized sound effects (Web Audio API)
 js/main.js                wires screens together, renders the terminal,
                           autosave, the save file and leaderboard upload
-js/cloud.js               leaderboard client (the only file that talks to
-                          the Worker)
-worker/                   the optional leaderboard server (Cloudflare Worker)
+js/cloud.js               accounts + leaderboard client (the only file that
+                          talks to the Worker)
+worker/                   the optional accounts/leaderboard server
+                          (Cloudflare Worker)
 data/manifest.json        unchanged copy from the original Python project
 data/dil/en.json          unchanged copies from the original Python project
 data/dil/tr.json

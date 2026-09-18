@@ -524,7 +524,7 @@ html, body {
 }
 .play-btn:hover, .play-btn:focus { background: var(--green); outline: none; }
 
-#lb-name {
+#lb-name, #acct-user, #acct-pass {
   width: 100%;
   background: #061006;
   border: 1px solid var(--border);
@@ -533,7 +533,13 @@ html, body {
   font-family: inherit;
   font-size: 13px;
 }
-#lb-name:focus { outline: none; border-color: var(--green); }
+#lb-name:focus, #acct-user:focus, #acct-pass:focus { outline: none; border-color: var(--green); }
+#lb-name:disabled { opacity: 0.6; cursor: not-allowed; }
 .field { display: flex; flex-direction: column; gap: 4px; color: var(--darkgreen); margin-top: 12px; }
 
 #leaderboard-table { margin-bottom: 12px; }
+
+.signin-btn { display: block; width: 100%; margin-top: 12px; padding: 8px; font-size: 13px; text-align: center; }
+#acct-signed-as { color: var(--white); margin: 0 0 8px; }
+#account-form .modal-actions { margin-top: 14px; }
+#leaderboard-table tr.me td { color: var(--white); font-weight: bold; background: rgba(51, 255, 102, 0.08); }

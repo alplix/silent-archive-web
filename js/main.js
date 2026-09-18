@@ -84,6 +84,7 @@ function wireAuthScreen() {
   btn.dataset.i18n = key;
   btn.textContent = window.I18N.t(key);
   btn.addEventListener("click", () => startGame(window.I18N.getUiLang()));
+  freshEl("#signin-btn").addEventListener("click", openAccount);
   btn.focus();
 }
 
@@ -435,7 +436,9 @@ async function printIntro() {
   printLine("=".repeat(72), "darkgreen");
   printLine("");
   const introLines = E.T("intro", { default: [] });
-  for (const l of introLines) {
+  const who = Cloud.getName().toUpperCase();
+  for (const raw of introLines) {
+    const l = raw.replace("A. DEREN", who);
     if (fast) printLine(l, "green"); else await typeLine(l, "green", 9);
   }
   printLine("");
@@ -786,6 +789,114 @@ $("#savefile-input").addEventListener("change", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// account: username + password. The server never sees the password (the key
+// is derived in the browser); an account keeps its progress on any device.
+// ---------------------------------------------------------------------------
+
+function renderAccountView() {
+  const t = window.I18N.t;
+  const signed = Cloud.isAccount();
+  $("#account-guest").classList.toggle("hidden", signed);
+  $("#account-user").classList.toggle("hidden", !signed);
+  $("#acct-signed-as").textContent = signed
+    ? t("acct_signed_as").replace("{name}", Cloud.accountName())
+    : t("acct_guest_state");
+  $("#acct-status").textContent = "";
+}
+
+function openAccount() {
+  renderAccountView();
+  $("#account-modal").classList.remove("hidden");
+  const first = Cloud.isAccount() ? $("#acct-close") : $("#acct-user");
+  first.focus();
+}
+
+function closeAccount() {
+  $("#account-modal").classList.add("hidden");
+  const input = $("#cmd-input");
+  if (inGame && input && !input.disabled) input.focus();
+}
+
+let accountBusy = false;
+
+async function submitAccount(mode) {
+  if (accountBusy) return;
+  const t = window.I18N.t;
+  const status = $("#acct-status");
+  accountBusy = true;
+  status.textContent = t("acct_working");
+  try {
+    await Cloud.authenticate(mode, $("#acct-user").value, $("#acct-pass").value);
+  } catch (err) {
+    accountBusy = false;
+    status.textContent = t({
+      bad_input: "acct_err_short", no_such_account: "acct_err_no_such",
+      wrong_password: "acct_err_wrong", name_taken: "acct_err_taken",
+    }[err.code] || "acct_err_net");
+    return;
+  }
+  $("#acct-pass").value = "";
+  await adoptAccountProgress();
+  accountBusy = false;
+  closeAccount();
+  showToast(t("toast_signed_in") + ": " + Cloud.getName());
+}
+
+// Right after signing in: decide between this device's progress and the
+// account's save. More turns played wins; if both hold real progress and the
+// account's would replace this device's, the player is asked.
+async function adoptAccountProgress() {
+  const E = window.Engine;
+  const t = window.I18N.t;
+  const lang = window.I18N.getUiLang();
+  const local = readLocalSave();
+  const cloudRaw = await Cloud.fetchSave();
+  const cloud = cloudRaw ? E.loadSanitizedState(cloudRaw, lang) : null;
+  const dev = local ? E.loadSanitizedState(local, lang) : null;
+  const meaningful = (st) => st && (st.turns > 0 || st.xp > 0);
+
+  let useCloud = false;
+  if (cloud && !meaningful(dev)) useCloud = true;
+  else if (cloud && meaningful(dev) && cloud.turns !== dev.turns) {
+    useCloud = window.confirm(t("acct_choose_save").replace("{dev}", dev.xp).replace("{cloud}", cloud.xp));
+  }
+
+  if (useCloud) {
+    startGame(lang, cloud);
+  } else if (inGame) {
+    persist(); // this device's progress now belongs to the account
+    syncDirty = true;
+    flushSync();
+    renderDashboard();
+  } else if (meaningful(dev)) {
+    syncDirty = true;
+    startGame(lang);
+    flushSync();
+  } else {
+    startGame(lang);
+  }
+}
+
+async function signOut() {
+  const t = window.I18N.t;
+  if (!window.confirm(t("acct_logout_confirm"))) return;
+  if (inGame && !gameOver) {
+    persist();
+    syncDirty = true;
+    await flushSync();
+  }
+  Cloud.logout();
+  clearSave();
+  location.reload();
+}
+
+$("#account-btn").addEventListener("click", openAccount);
+$("#acct-close").addEventListener("click", closeAccount);
+$("#account-form").addEventListener("submit", (e) => { e.preventDefault(); submitAccount("login"); });
+$("#acct-register").addEventListener("click", () => submitAccount("register"));
+$("#acct-logout").addEventListener("click", signOut);
+
+// ---------------------------------------------------------------------------
 // leaderboard + automatic upload. Purely an add-on: the game and its saves
 // are local, so if the server is ever unreachable nothing else changes.
 // Throttled on purpose (the free server tier allows ~1000 writes a day):
@@ -814,6 +925,14 @@ async function runAutoSync({ keepalive = false } = {}) {
     await Cloud.saveToCloud(window.Engine.getState(), { keepalive });
     lastSyncAt = Date.now();
   } catch (err) {
+    if (err && err.status === 409) {
+      // Someone registered the name this guest was using. Fall back to the default.
+      Cloud.setName("");
+      showToast(window.I18N.t("toast_name_taken"), "warn");
+      syncDirty = true;
+      if (!keepalive) { lastSyncAt = Date.now(); markSyncDirty(); }
+      return;
+    }
     if (err && err.status === 400) {
       console.warn("leaderboard upload was rejected as malformed", err); // our bug: don't hammer the server
       return;
@@ -849,6 +968,7 @@ async function renderLeaderboard() {
     rows.forEach((r, i) => {
       const rankName = E.rankName(E.rankIndex(r.xp || 0));
       const tr = document.createElement("tr");
+      if ((r.name || "").toLowerCase() === Cloud.getName().toLowerCase()) tr.className = "me";
       tr.innerHTML = `<td>${i + 1}</td><td>${escapeHtml(r.name || "?")}</td><td>${escapeHtml(rankName)}</td><td>${r.xp ?? 0}</td><td>${r.findings ?? 0}</td>`;
       tbody.appendChild(tr);
     });
@@ -860,6 +980,8 @@ async function renderLeaderboard() {
 
 function openLeaderboard() {
   $("#lb-name").value = Cloud.getName();
+  $("#lb-name").disabled = Cloud.isAccount();
+  $("#lb-save-name").disabled = Cloud.isAccount();
   $("#leaderboard-modal").classList.remove("hidden");
   renderLeaderboard();
 }
