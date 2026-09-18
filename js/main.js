@@ -464,6 +464,7 @@ function updateTopbarText() {
     ? `${window.I18N.t("operator_label")}: ${Auth.displayNameFor(currentUser)}`
     : window.I18N.t("guest_mode");
   $("#sync-btn").classList.toggle("hidden", !currentUser);
+  updateSyncButton();
 }
 
 async function printIntro() {
@@ -729,10 +730,11 @@ function clearSave() {
 }
 
 // Local save happens on every state-changing action (see handleLine()).
-// Syncing to GitHub is a separate, manual action (see wireSyncButton())
-// since it opens a real GitHub issue page rather than writing silently.
+// If the player has enabled auto-save (their own GitHub token, see
+// js/auth.js), the change also queues a throttled push to GitHub.
 function persist() {
   writeLocalSave(window.Engine.getState());
+  markSyncDirty();
 }
 
 async function reloadSave() {
@@ -742,12 +744,135 @@ async function reloadSave() {
   E.setState(E.loadSanitizedState(data, E.getState().lang));
 }
 
+// ---------------------------------------------------------------------------
+// GitHub auto-save: throttled, so a burst of commands becomes one sync (each
+// sync is an issue edit -> a workflow run -> a commit on the player-data
+// branch, so don't send one per keystroke).
+// ---------------------------------------------------------------------------
+
+const SYNC_FIRST_DELAY_MS = 15000;
+const SYNC_MIN_GAP_MS = 120000;
+let syncTimer = null;
+let syncDirty = false;
+let syncBlocked = false;   // token rejected: stop retrying until it's re-entered
+let lastSyncAt = 0;
+
+function markSyncDirty() {
+  if (!currentUser || !Auth.hasToken() || syncBlocked) return;
+  syncDirty = true;
+  if (syncTimer) return;
+  const wait = Math.max(SYNC_FIRST_DELAY_MS, lastSyncAt + SYNC_MIN_GAP_MS - Date.now());
+  syncTimer = setTimeout(() => { syncTimer = null; runAutoSync(); }, wait);
+}
+
+// Returns true on success (or when there's nothing to do).
+async function runAutoSync({ keepalive = false, force = false } = {}) {
+  if (!currentUser || !Auth.hasToken()) return true;
+  if (!syncDirty && !force) return true;
+  syncDirty = false;
+  const t = window.I18N.t;
+  try {
+    await Auth.autoSync(window.Engine.getState(), currentUser.username, { keepalive });
+    lastSyncAt = Date.now();
+    updateSyncButton(true);
+    return true;
+  } catch (err) {
+    syncDirty = true;
+    if (err && [401, 403, 404].includes(err.status)) {
+      syncBlocked = true;
+      updateSyncButton(false);
+      if (!keepalive) showToast(t("toast_sync_auth"), "danger");
+    } else if (!keepalive) {
+      showToast(t("toast_sync_fail"), "warn");
+      lastSyncAt = Date.now(); // wait a full gap before retrying
+      markSyncDirty();
+    }
+    return false;
+  }
+}
+
+// Last-chance push when the tab is hidden/closed.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") return;
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  if (syncDirty) runAutoSync({ keepalive: true });
+});
+
+function updateSyncButton(ok) {
+  const btn = $("#sync-btn");
+  if (!btn) return;
+  const on = Auth.hasToken() && !syncBlocked;
+  btn.textContent = window.I18N.t("btn_sync") + (on ? (ok === false ? " !" : " ●") : "");
+}
+
+function closeSyncModal() {
+  $("#sync-modal").classList.add("hidden");
+  const input = $("#cmd-input");
+  if (input && !input.disabled) input.focus();
+}
+
+function openSyncModal() {
+  const t = window.I18N.t;
+  $("#sync-body").textContent = t("sync_body").replace("{repo}", Auth.REPO_SLUG);
+  $("#sync-token").value = "";
+  $("#sync-status").textContent = "";
+  $("#sync-disable").classList.toggle("hidden", !Auth.hasToken());
+  $("#sync-modal").classList.remove("hidden");
+  $("#sync-token").focus();
+}
+
+async function enableAutoSync() {
+  const t = window.I18N.t;
+  const token = $("#sync-token").value.trim();
+  if (!token) return;
+  Auth.setToken(token);
+  syncBlocked = false;
+  $("#sync-status").textContent = "...";
+
+  // The token proves who the player really is; prefer that over the typed name.
+  const login = await Auth.whoami();
+  if (login) {
+    Auth.setUsername(login);
+    currentUser = { username: login };
+    updateTopbarText();
+  }
+
+  const ok = await runAutoSync({ force: true });
+  if (ok) {
+    closeSyncModal();
+    showToast(t("toast_synced"));
+  } else {
+    // runAutoSync already flagged a bad token; don't keep a token that fails.
+    if (syncBlocked) Auth.setToken(null);
+    $("#sync-status").textContent = t(syncBlocked ? "toast_sync_auth" : "toast_sync_fail");
+    updateSyncButton();
+  }
+}
+
+function disableAutoSync() {
+  Auth.setToken(null);
+  syncDirty = false;
+  syncBlocked = false;
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  updateSyncButton();
+  closeSyncModal();
+}
+
 function wireSyncButton() {
   freshEl("#sync-btn").addEventListener("click", () => {
-    if (!currentUser) return;
-    Auth.submitSync(window.Engine.getState());
+    if (currentUser) openSyncModal();
   });
+  updateSyncButton();
 }
+
+$("#sync-enable").addEventListener("click", enableAutoSync);
+$("#sync-disable").addEventListener("click", disableAutoSync);
+$("#sync-close").addEventListener("click", closeSyncModal);
+$("#sync-token").addEventListener("keydown", (e) => { if (e.key === "Enter") enableAutoSync(); });
+$("#sync-manual").addEventListener("click", () => {
+  Auth.submitSync(window.Engine.getState());
+  closeSyncModal();
+});
 
 // ---------------------------------------------------------------------------
 // leaderboard modal + topbar
@@ -783,6 +908,7 @@ $("#leaderboard-close").addEventListener("click", () => $("#leaderboard-modal").
 $("#leaderboard-btn").addEventListener("click", openLeaderboard);
 $("#logout-btn").addEventListener("click", async () => {
   persist();
+  if (syncDirty) await runAutoSync();
   if (currentUser) { try { await Auth.logout(); } catch { /* ignore */ } }
   currentUser = null;
   location.reload();

@@ -1,14 +1,22 @@
 name: Sync save / leaderboard
 
-# Reacts to issues opened by the game's "Sync to GitHub" button (always
-# labeled "sync"). Writes data/saves/<author>.json and updates
-# data/leaderboard.json, using the issue's real author as identity — never
-# anything the issue body claims — so a player can only overwrite their own
-# data. See js/auth.js and .github/scripts/sync-issue.js for the full story.
+# Reacts to issues whose title starts with "sync:" — either the one auto-save
+# issue the game keeps per player (title "sync: auto", created/edited through
+# the GitHub API with the player's own token) or a one-off manual one opened
+# from the "Sync to GitHub" dialog. Writes saves/<author>.json and
+# leaderboard.json on the `player-data` branch (not `main`, so progress syncs
+# never trigger a GitHub Pages rebuild), using the issue's real author as
+# identity — never anything the issue body claims — so a player can only
+# overwrite their own data. See js/auth.js and .github/scripts/sync-issue.js.
+#
+# SECURITY: issue titles/bodies are attacker-controlled. Never interpolate
+# ${{ ... }} expressions derived from them (or from step outputs that echo
+# them) into a `run:` script — pass them through `env:` and reference the
+# shell variable instead.
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited]
 
 permissions:
   contents: write
@@ -16,39 +24,77 @@ permissions:
 
 jobs:
   sync:
-    if: contains(github.event.issue.labels.*.name, 'sync')
+    if: startsWith(github.event.issue.title, 'sync:')
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      ISSUE_USER: ${{ github.event.issue.user.login }}
+      ISSUE_TITLE: ${{ github.event.issue.title }}
+      REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Process the sync issue
+      - uses: actions/checkout@v4
+        with:
+          ref: player-data
+          path: player-data
+
+      - name: Process the sync issue and commit
         id: sync
-        env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_USER: ${{ github.event.issue.user.login }}
-        run: node .github/scripts/sync-issue.js
-
-      - name: Commit and push
-        if: steps.sync.outputs.status == 'ok'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/saves data/leaderboard.json
-          git commit -m "sync: ${{ steps.sync.outputs.username }}"
-          git push
+          RESULT="$RUNNER_TEMP/result.json"
+          export RESULT_PATH="$RESULT"
+          export DATA_DIR="$GITHUB_WORKSPACE/player-data"
+          status="error"
+          message="Could not push to the player-data branch."
+          username=""
+          for i in 1 2 3 4 5; do
+            git -C player-data fetch -q origin player-data
+            git -C player-data reset -q --hard origin/player-data
+            # Always read the issue's CURRENT body, not the event's snapshot,
+            # so two close-together edits converge on the newest one.
+            ISSUE_BODY="$(gh api "repos/$REPO/issues/$ISSUE_NUMBER" --jq .body)"
+            export ISSUE_BODY
+            rm -f "$RESULT"
+            node .github/scripts/sync-issue.js
+            status="$(jq -r .status "$RESULT")"
+            message="$(jq -r .message "$RESULT")"
+            username="$(jq -r '.username // ""' "$RESULT")"
+            [ "$status" = "ok" ] || break
+            git -C player-data add -A
+            git -C player-data -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "sync: $username"
+            if git -C player-data push -q origin HEAD:player-data; then
+              break
+            fi
+            status="error"
+            message="Could not push to the player-data branch."
+            sleep $((RANDOM % 6 + 2))
+          done
+          {
+            echo "status=$status"
+            echo "message=$message"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Comment and close (success)
-        if: steps.sync.outputs.status == 'ok'
+      - name: Report result on the issue
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SYNC_STATUS: ${{ steps.sync.outputs.status }}
+          SYNC_MESSAGE: ${{ steps.sync.outputs.message }}
         run: |
-          gh issue comment "${{ github.event.issue.number }}" --body "✅ ${{ steps.sync.outputs.message }}"
-          gh issue close "${{ github.event.issue.number }}"
-
-      - name: Comment and close (rejected)
-        if: steps.sync.outputs.status == 'rejected'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue comment "${{ github.event.issue.number }}" --body "❌ Could not sync: ${{ steps.sync.outputs.message }}"
-          gh issue close "${{ github.event.issue.number }}"
+          # The persistent auto-save issue stays open and quiet on success;
+          # manual one-off issues get a comment and are closed.
+          manual=true
+          if [ "$ISSUE_TITLE" = "sync: auto" ]; then manual=false; fi
+          if [ "$SYNC_STATUS" = "ok" ]; then
+            if [ "$manual" = true ]; then
+              gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "✅ $SYNC_MESSAGE"
+              gh issue close "$ISSUE_NUMBER" --repo "$REPO"
+            fi
+          else
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "❌ Could not sync: $SYNC_MESSAGE"
+            if [ "$manual" = true ]; then
+              gh issue close "$ISSUE_NUMBER" --repo "$REPO"
+            fi
+          fi

@@ -413,6 +413,30 @@ html, body {
   color: var(--green);
 }
 
+#sync-modal a { color: var(--cyan); }
+#sync-token {
+  width: 100%;
+  box-sizing: border-box;
+  background: #061006;
+  border: 1px solid var(--border);
+  color: var(--green);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+#sync-token:focus { outline: none; border-color: var(--green); }
+.modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.modal-actions button:not(.secondary) {
+  background: var(--darkgreen);
+  color: #041004;
+  border: none;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+.modal-actions button:not(.secondary):hover { background: var(--green); }
+
 #tutorial-close, #leaderboard-close {
   margin-top: 16px;
   background: var(--darkgreen);
