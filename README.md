@@ -102,6 +102,8 @@ js/engine.js              a faithful JS port of scp.py;
 js/i18n.js                site-chrome localization (start screen, top bar,
                           tutorial, toasts, dialogs)
 js/sfx.js                 synthesized sound effects (Web Audio API)
+js/atmosphere.js          the "strange events": glitches, phantom text,
+                          colour shifts, blackouts (cosmetic only)
 js/main.js                wires screens together, renders the terminal,
                           autosave, the save file and leaderboard upload
 js/cloud.js               accounts + leaderboard client (the only file that
@@ -130,9 +132,26 @@ data/dil/fr.json
 - **Four languages** (English, Türkçe, Español, Français) chosen from the
   dropdown at the top right, on every screen; it covers the whole site and
   all archive content, and can also be changed mid-game with `lang <code>`.
+  Only English (the fallback) and the chosen language are downloaded, others
+  load on demand, so the first visit stays light.
   Adding a language is a matter of dropping a new `data/dil/<code>.json`
   file and registering it in `js/languages.js` — see that file's comment
   for the full checklist.
+- **Colour and themes**: five themes (a multi-hued low-glare default,
+  classic green terminal, amber, ice, and a light "paper" theme) cycled with
+  the ◐ button; SCP numbers, object classes, redactions, percentages, access
+  keys and quoted speech are colour-coded in the output.
+- **Strange events**: the longer the player reads (contamination), the more
+  the terminal misbehaves: lines glitch, phantom text that isn't in the game
+  appears and fades, colours shift, the title bar changes, the connection
+  "drops", a heartbeat starts. It is all cosmetic and temporary, never touches
+  the game state, can be switched off with the 👁 button and skips flashing
+  effects when the OS asks for reduced motion.
+- **Hints**: the sidebar counts contradictions you can already record
+  ("Ready to compare"); the `hint` command points at the next one at the cost
+  of a little contamination.
+- **Endings tracker**: which endings this browser has reached (and whether
+  with a full set of findings), under the Endings button.
 - **Typewriter effect**: record/finding/mail text, day narratives and
   endings reveal with a flowing "typing" animation (a web port of the
   original terminal's `slow()` calls); clicking the terminal instantly
