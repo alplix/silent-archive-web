@@ -84,6 +84,48 @@
     es: ["CONEXIÓN PERDIDA", "…conexión restablecida. Hay algo más conectado."],
     fr: ["CONNEXION PERDUE", "…connexion rétablie. Autre chose est connecté aussi."],
   };
+  Object.assign(PHANTOM, {
+    de: [
+      "{name}, Sie sind nicht der Erste, der diese Akte liest.",
+      "Es hat Sie zuerst gelesen.",
+      "Öffnen Sie die Tür im Untergeschoss 3 nicht.",
+      "Jemand anderes liest diese Datensätze ebenfalls. Prüfen Sie die Zeitstempel.",
+      "Sie werden gerade abgeglichen.",
+      "Auch die Toten stehen auf der Liste.",
+      "Bitte hören Sie auf zu lesen. Bitte.",
+      "Sehen Sie nicht auf die geschwärzten Stellen. Sie sehen zurück.",
+      "Der letzte Prüfer hörte am elften Tag auf.",
+      "Das haben Sie getippt. Oder nicht?",
+    ],
+    pt: [
+      "{name}, você não é a primeira pessoa a ler este arquivo.",
+      "Ele leu você primeiro.",
+      "Não abra a porta do Subnível 3.",
+      "Alguém mais tem lido estes registros. Veja os carimbos de data.",
+      "Você está sendo cruzado com outros registros.",
+      "Os mortos também estão na lista.",
+      "Pare de ler. Por favor.",
+      "Não olhe para as partes censuradas. Elas olham de volta.",
+      "O último auditor parou no décimo primeiro dia.",
+      "Isso foi você quem digitou. Não foi?",
+    ],
+  });
+  Object.assign(TITLES, {
+    de: ["es liest Sie zurück", "schließen Sie diesen Tab nicht", "S̷t̷u̷m̷m̷e̷s̷ ̷A̷r̷c̷h̷i̷v̷"],
+    pt: ["ele está lendo você de volta", "não feche esta aba", "A̷r̷q̷u̷i̷v̷o̷ ̷S̷i̷l̷e̷n̷c̷i̷o̷s̷o̷"],
+  });
+  Object.assign(TYPED, {
+    de: ["hilf mir", "hinter dir", "nicht", "es ist hier"],
+    pt: ["me ajude", "atrás de você", "não faça", "está aqui"],
+  });
+  Object.assign(REVEAL, {
+    de: ["HIER", "SIEH", "LAUF", "SIE"],
+    pt: ["AQUI", "OLHE", "CORRA", "VOCÊ"],
+  });
+  Object.assign(LOST, {
+    de: ["VERBINDUNG UNTERBROCHEN", "…Verbindung wiederhergestellt. Etwas anderes ist ebenfalls verbunden."],
+    pt: ["CONEXÃO PERDIDA", "…conexão restabelecida. Há algo mais conectado."],
+  });
   const NOISE = "▓▒░█#@%&?/|<>~§Ω¥¤Ж";
 
   const S = {
