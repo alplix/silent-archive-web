@@ -12,6 +12,7 @@ const LANGUAGE_META = [
   { code: "es", label: "Español" },
   { code: "fr", label: "Français" },
   { code: "de", label: "Deutsch" },
+  { code: "pt", label: "Português" },
 ];
 
 window.LANGUAGE_META = LANGUAGE_META;
