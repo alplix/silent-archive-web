@@ -51,7 +51,7 @@ const other = key.split("").reverse().join("");
 r = await call("/api/save", "GET", { auth: other });
 check("a different key cannot read this save", r.status === 404, String(r.status));
 
-r = await call("/api/save", "PUT", { auth: other, body: { name: "x", state: state({ xp: 99999 }) } });
+r = await call("/api/save", "PUT", { auth: other, body: { name: "x", state: state({ xp: 999999 }) } });
 check("out-of-range xp -> 400", r.status === 400, String(r.status));
 
 r = await call("/api/save", "PUT", { auth: other, body: { name: "x", state: { ...state(), extra: "junk" }, surprise: 1 } });
