@@ -1,11 +1,14 @@
 # The Silent Archive — Web
 
-Browser-playable version of the terminal SCP investigation game, with
-rank/XP progression, automatic resume-where-you-left-off saves and a
-leaderboard. The game and all content (565 records, 303 findings, six
-languages) are identical to the original Python/terminal version — this repo
-just re-implements the same engine to run client-side, reading the same data
-files unchanged.
+A SCiPNET terminal in the browser for reading the **real SCP Wiki**. The
+archive holds 4,954 real SCP Foundation articles (SCP-002 to SCP-4999), each
+shown unedited with its author and a link to the original page. The game only
+adds the terminal around them: clearance by object class, ranks and experience,
+cognitive contamination, and "findings" — the real links between articles.
+
+**No content in this project is invented.** Every article comes from the
+[SCP Wiki](https://scp-wiki.wikidot.com) and belongs to its authors (see
+[Content and licence](#content-and-licence)).
 
 **The game is a fully static site**: plain files on GitHub Pages, nothing for
 players to set up. **Accounts and the leaderboard are a separate optional
@@ -19,6 +22,37 @@ guest.
 ## Live site
 
 **https://alplix.github.io/silent-archive-web/**
+
+## How it plays
+
+- `list` shows the five series; `list 2` or `list keter` pages through a series
+  or an object class (most-rated first); `search sculpture` finds articles by
+  name or number; `read 173` opens one; `random` picks an unread one.
+- **Clearance** depends on rank: level 1 opens Safe (and neutralized/explained)
+  files, level 2 adds Euclid, level 3 Keter, level 4 Thaumiel, Apollyon and
+  Archon. Locked files show the level they need.
+- **Contamination** rises as you read (dangerous classes faster). Above 40% the
+  text on screen starts to corrupt. `rest` and reading SCP-999 lower it; at 100%
+  an emergency decontamination resets it to 50%.
+- **Findings**: when an article names another article you have read, the two
+  are linked. `cross A B` records the link, shows the sentence where one names
+  the other, and earns experience. `hint` points at the next link for a small
+  contamination cost, and the sidebar counts the links you can already record.
+
+## Content and licence
+
+The articles, their text and their authorship belong to the SCP Wiki community
+and are licensed **CC BY-SA 3.0**. Every article is displayed with its author,
+its rating and a link to the original page, and the project's own code and
+interface text are shared under the same licence. Article HTML was converted to
+plain text (headings, lists and tables flattened; images, navigation and
+collapsible toggles removed); nothing else was changed. The data comes from the
+public [scp-data](https://scp-data.tedivm.com) dump of the wiki, and article
+names come from the wiki's series pages. Series 6 and later are not included
+yet. See [`data/library/NOTICE.md`](data/library/NOTICE.md).
+
+SCP Foundation is a collaborative fiction project; the Foundation's concepts
+belong to the SCP Wiki (<https://scpwiki.com>).
 
 ## Run locally
 
@@ -95,10 +129,10 @@ laid out to be served as-is from the repository root.
 
 ```
 index.html                start screen, game screen, modals
-style.css                 terminal look and feel
+style.css                 terminal look and feel, themes
 js/languages.js           registry of available languages (add a language here)
-js/engine.js              a faithful JS port of scp.py;
-                          reads manifest.json + dil/*.json unchanged
+js/engine.js              the game: commands, clearance, contamination, links;
+                          loads the article index and text on demand
 js/i18n.js                site-chrome localization (start screen, top bar,
                           tutorial, toasts, dialogs)
 js/sfx.js                 synthesized sound effects (Web Audio API)
@@ -110,61 +144,35 @@ js/cloud.js               accounts + leaderboard client (the only file that
                           talks to the Worker)
 worker/                   the optional accounts/leaderboard server
                           (Cloudflare Worker)
-data/manifest.json        unchanged copy from the original Python project
-data/dil/en.json          unchanged copies from the original Python project
-data/dil/tr.json
-data/dil/es.json
-data/dil/fr.json
-data/dil/de.json
-data/dil/pt.json
+data/library/meta.json    index of all articles: number, name, class, rating,
+                          links to other articles
+data/library/cNN.json     article text + author, 100 numbers per file
+data/library/NOTICE.md    attribution and conversion notes
+data/dil/<code>.json      interface text and command words per language
+                          (en, tr, es, fr, de, pt)
 ```
 
-## Features
+The interface is available in six languages (English, Türkçe, Español,
+Français, Deutsch, Português). **Articles are always shown in their original
+English**; only the terminal around them is translated. Adding a language is a
+matter of adding `data/dil/<code>.json` (copy `en.json`) and registering it in
+`js/languages.js`.
 
-- **Sidebar**: an always-visible status panel (clearance, day, findings
-  count, contamination and XP bars), and a clickable, searchable record
-  browser with separate Records/Findings tabs — click to read a record,
-  check two you've read and hit "Compare" to cross-reference them; typing
-  commands still works, it's just no longer required.
-- **Sound effects and toasts**: short synthesized cues (Web Audio API, no
-  audio files) plus animated toast notifications for new findings,
-  rank-ups, and rising/critical contamination — toggle sound off with the
-  🔊 button in the topbar. A contamination "tension vignette" overlay adds
-  visual pressure as the day and contamination meters climb.
-- **Six languages** (English, Türkçe, Español, Français, Deutsch, Português) chosen from the
-  dropdown at the top right, on every screen; it covers the whole site and
-  all archive content, and can also be changed mid-game with `lang <code>`.
-  Only English (the fallback) and the chosen language are downloaded, others
-  load on demand, so the first visit stays light.
-  Adding a language is a matter of dropping a new `data/dil/<code>.json`
-  file and registering it in `js/languages.js` — see that file's comment
-  for the full checklist.
+## Other features
+
 - **Colour and themes**: five themes (a multi-hued low-glare default,
   classic green terminal, amber, ice, and a light "paper" theme) cycled with
-  the ◐ button; SCP numbers, object classes, redactions, percentages, access
-  keys and quoted speech are colour-coded in the output.
-- **Strange events**: the longer the player reads (contamination), the more
-  the terminal misbehaves: lines glitch, phantom text that isn't in the game
-  appears and fades, colours shift, the title bar changes, the connection
-  "drops", a heartbeat starts. It is all cosmetic and temporary, never touches
-  the game state, can be switched off with the 👁 button and skips flashing
-  effects when the OS asks for reduced motion.
-- **Hints**: the sidebar counts contradictions you can already record
-  ("Ready to compare"); the `hint` command points at the next one at the cost
-  of a little contamination.
-- **Endings tracker**: which endings this browser has reached (and whether
-  with a full set of findings), under the Endings button.
-- **Typewriter effect**: record/finding/mail text, day narratives and
-  endings reveal with a flowing "typing" animation (a web port of the
-  original terminal's `slow()` calls); clicking the terminal instantly
-  finishes the line currently animating.
-- **"How to play" onboarding** — auto-shown on first game start, explaining
-  the goal, object classes, clearance levels, contamination, the
-  finding/cross-reference mechanic and the 11-day clock; reopenable
-  anytime from the topbar button.
-
-## License
-
-SCP Foundation concepts belong to the collaborative
-[SCP Wiki](https://scpwiki.com), licensed CC BY-SA 3.0. All prose in this
-game is original and shared under the same licence.
+  the ◐ button; SCP numbers, object classes, redactions, percentages and quoted
+  text are colour-coded in the output.
+- **Strange events**: the more contaminated the reader, the more the terminal
+  misbehaves: lines glitch, phantom text that isn't in the archive appears and
+  fades, colours shift, the title bar changes, the connection "drops", a
+  heartbeat starts. All cosmetic and temporary; switch it off with the 👁
+  button. Flashing effects are skipped when the OS asks for reduced motion.
+- **Sound effects and toasts**: short synthesized cues (Web Audio API, no
+  audio files) plus toast notifications; toggle sound with the 🔊 button.
+- **Typewriter effect**: the first paragraphs of an article reveal with a
+  typing animation; click the terminal to finish it, or use `speed` to switch it
+  off.
+- **"How to play" onboarding**, shown on first start and reopenable from the
+  top bar.

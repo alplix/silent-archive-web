@@ -85,7 +85,6 @@ function wireAuthScreen() {
   btn.textContent = window.I18N.t(key);
   btn.addEventListener("click", () => startGame(window.I18N.getUiLang()));
   freshEl("#signin-btn").addEventListener("click", openAccount);
-  paintEndingsCount();
   btn.focus();
 }
 
@@ -142,16 +141,10 @@ function renderDashboard() {
   const s = E.getState();
 
   $("#stat-clearance").textContent = `${s.clearance} / ${E.RULES.clearance_max}`;
-  $("#stat-day").textContent = `${s.day} / ${E.RULES.days_max}`;
-  $("#stat-findings").textContent = `${s.findings.length} / ${E.FINDING_ORDER.length}`;
+  $("#stat-findings").textContent = `${s.findings.length}`;
   const ready = E.readyPairs().length;
   $("#stat-ready").textContent = ready;
   $("#stat-ready").classList.toggle("hot", ready > 0);
-
-  const dayPct = Math.min(100, Math.round((s.day / E.RULES.days_max) * 100));
-  const dayMeter = $("#meter-day");
-  dayMeter.style.width = dayPct + "%";
-  dayMeter.className = "meter-fill day" + (s.day >= E.RULES.days_max - 2 ? " urgent" : "");
 
   const c = s.contam;
   $("#stat-contam-pct").textContent = `${c}%`;
@@ -183,6 +176,47 @@ function renderDashboard() {
 let browserTab = "records";
 let browserSearch = "";
 
+function browserRow(row, s) {
+  const E = window.Engine;
+  const isRead = s.read.includes(row.id);
+  const locked = !isRead && !E.accessible(row.id);
+  const el = document.createElement("div");
+  el.className = "rb-row" + (isRead ? " read" : "") + (locked ? " locked" : "");
+  const check = document.createElement("span");
+  check.className = "rb-check" + (crossPicks.includes(row.id) ? " picked" : "");
+  if (isRead) {
+    check.textContent = crossPicks.includes(row.id) ? "✓" : "";
+    check.addEventListener("click", (e) => { e.stopPropagation(); toggleCrossPick(row.id); });
+  } else {
+    check.style.visibility = "hidden";
+  }
+  el.appendChild(check);
+  const name = document.createElement("span");
+  name.className = "rb-name";
+  name.textContent = row.id.slice(4) + "  " + (row.name || "");
+  el.appendChild(name);
+  const tag = document.createElement("span");
+  tag.className = "rb-tag";
+  tag.textContent = locked ? "L" + E.need(row) : E.classCap(row.cls).slice(0, 1);
+  tag.title = E.classCap(row.cls);
+  el.appendChild(tag);
+  if (!locked) {
+    el.addEventListener("click", () => {
+      window.SFX.open();
+      handleLine("read " + row.id);
+      $("#sidebar").classList.remove("open");
+    });
+  }
+  return el;
+}
+
+function browserHeader(text) {
+  const h = document.createElement("div");
+  h.className = "rb-act-header";
+  h.textContent = text;
+  return h;
+}
+
 function renderRecordBrowser() {
   if (browserTab === "findings") { renderFindingsList(); return; }
 
@@ -191,65 +225,30 @@ function renderRecordBrowser() {
   const t = window.I18N.t;
   const box = $("#record-browser");
   box.innerHTML = "";
-
   const needle = E.fold(browserSearch);
-  const accessible = E.RECORD_ORDER.filter((rid) => E.accessible(rid))
-    .filter((rid) => !needle || E.fold(E.T("records", rid, "name", { default: rid })).includes(needle));
 
-  if (!accessible.length) {
-    const p = document.createElement("div");
-    p.className = "rb-tag";
-    p.textContent = browserSearch ? t("browser_no_match") : t("browser_empty");
-    box.appendChild(p);
+  if (needle) {
+    const digits = /^\d+$/.test(needle) ? String(parseInt(needle, 10)) : null;
+    const hits = E.ROWS.filter((r) => E.fold(r.name).includes(needle) || (digits && String(r.n).includes(digits)))
+      .sort((a, b) => b.rating - a.rating).slice(0, 60);
+    if (!hits.length) {
+      const p = document.createElement("div");
+      p.className = "rb-tag";
+      p.textContent = t("browser_no_match");
+      box.appendChild(p);
+      return;
+    }
+    for (const row of hits) box.appendChild(browserRow(row, s));
     return;
   }
 
-  let currentAct = null;
-  for (const rid of accessible) {
-    const meta = E.RECORDS[rid];
-    if (meta.act !== currentAct) {
-      currentAct = meta.act;
-      const h = document.createElement("div");
-      h.className = "rb-act-header";
-      h.style.marginTop = currentAct === meta.act && box.children.length === 0 ? "0" : "";
-      h.textContent = E.T("acts", String(currentAct), "title", { default: "ACT " + currentAct });
-      box.appendChild(h);
-    }
-    const isRead = s.read.includes(rid);
-    const row = document.createElement("div");
-    row.className = "rb-row" + (isRead ? " read" : "");
-
-    if (isRead) {
-      const check = document.createElement("span");
-      check.className = "rb-check" + (crossPicks.includes(rid) ? " picked" : "");
-      check.textContent = crossPicks.includes(rid) ? "✓" : "";
-      check.addEventListener("click", (e) => { e.stopPropagation(); toggleCrossPick(rid); });
-      row.appendChild(check);
-    } else {
-      const spacer = document.createElement("span");
-      spacer.className = "rb-check";
-      spacer.style.visibility = "hidden";
-      row.appendChild(spacer);
-    }
-
-    const name = document.createElement("span");
-    name.className = "rb-name";
-    name.textContent = (E.T("records", rid, "name", { default: rid }));
-    row.appendChild(name);
-
-    if (isRead) {
-      const tag = document.createElement("span");
-      tag.className = "rb-tag";
-      tag.textContent = "✓";
-      row.appendChild(tag);
-    }
-
-    row.addEventListener("click", () => {
-      window.SFX.open();
-      handleLine("read " + rid);
-    });
-    box.appendChild(row);
+  const recent = E.recentRead(15);
+  if (recent.length) {
+    box.appendChild(browserHeader(t("browser_recent")));
+    for (const row of recent) box.appendChild(browserRow(row, s));
   }
+  box.appendChild(browserHeader(t("browser_sugg")));
+  for (const row of E.suggestions(20)) box.appendChild(browserRow(row, s));
 }
 
 function renderFindingsList() {
@@ -258,10 +257,11 @@ function renderFindingsList() {
   const t = window.I18N.t;
   const box = $("#record-browser");
   box.innerHTML = "";
-
   const needle = E.fold(browserSearch);
-  const found = E.FINDING_ORDER.filter((fid) => s.findings.includes(fid))
-    .filter((fid) => !needle || E.fold(E.T("findings", fid, "title", { default: fid })).includes(needle));
+  const found = s.findings.slice().reverse().filter((key) => {
+    const [a, b] = key.split("|").map((id) => E.rowFor(id));
+    return !needle || (a && E.fold(a.name).includes(needle)) || (b && E.fold(b.name).includes(needle)) || E.fold(key).includes(needle);
+  });
 
   if (!found.length) {
     const p = document.createElement("div");
@@ -271,27 +271,23 @@ function renderFindingsList() {
     return;
   }
 
-  for (const fid of found) {
+  for (const key of found.slice(0, 80)) {
+    const [ida, idb] = key.split("|");
+    const a = E.rowFor(ida), b = E.rowFor(idb);
     const card = document.createElement("div");
     card.className = "finding-card";
     const title = document.createElement("div");
     title.className = "fc-title";
-    title.textContent = E.T("findings", fid, "title", { default: fid });
+    title.textContent = `${ida.slice(4)} ↔ ${idb.slice(4)}`;
     const excerpt = document.createElement("div");
     excerpt.className = "fc-excerpt";
-    const full = E.T("findings", fid, "text", { default: "" });
-    excerpt.textContent = full.length > 100 ? full.slice(0, 100) + "…" : full;
+    excerpt.textContent = `${a ? a.name : ""} / ${b ? b.name : ""}`;
     card.appendChild(title);
     card.appendChild(excerpt);
     card.addEventListener("click", () => {
       window.SFX.open();
-      printLine("", "");
-      printLine("=".repeat(72), "darkgreen");
-      printLine("  " + title.textContent, "bold white");
-      printLine("", "");
-      printLine(full, "green");
-      printLine("=".repeat(72), "darkgreen");
-      scrollDown();
+      handleLine(`cross ${ida} ${idb}`);
+      $("#sidebar").classList.remove("open");
     });
     box.appendChild(card);
   }
@@ -346,7 +342,8 @@ function renderCrossTray() {
     const row = document.createElement("div");
     row.className = "cross-pick";
     const name = document.createElement("span");
-    name.textContent = E.T("records", rid, "name", { default: rid });
+    const info = E.rowFor(rid);
+    name.textContent = rid.slice(4) + (info && info.name ? "  " + info.name : "");
     const rm = document.createElement("button");
     rm.textContent = "×";
     rm.addEventListener("click", () => toggleCrossPick(rid));
@@ -442,17 +439,12 @@ async function printIntro() {
   printLine("  " + E.T("ui", "banner_sub"), "dim darkgreen");
   printLine("=".repeat(72), "darkgreen");
   printLine("");
-  const introLines = E.T("intro", { default: [] });
   const who = Cloud.getName().toUpperCase();
-  for (const raw of introLines) {
-    const l = raw.replace("A. DEREN", who);
+  for (const raw of E.T("ui", "lib_intro")) {
+    const l = "  " + raw.replace("{name}", who);
     if (fast) printLine(l, "green"); else await typeLine(l, "green", 9);
   }
   printLine("");
-  printLine("=".repeat(72), "darkgreen");
-  printLine("  " + E.T("acts", "1", "title"), "bold cyan");
-  const blurb = E.T("acts", "1", "blurb", { default: "" });
-  if (fast) printLine(blurb, "green"); else await typeLine(blurb, "green", 9);
   printLine("=".repeat(72), "darkgreen");
   printLine(E.T("ui", "intro_hint"), "cyan");
   printLine("=".repeat(72), "darkgreen");
@@ -662,7 +654,7 @@ async function handleLine(raw) {
   }
 
   const before = snapshot(E.getState());
-  const result = E.runCommand(raw);
+  const result = await E.runCommand(raw);
   if (!result) return;
 
   if (result.loadLang) {
@@ -725,12 +717,6 @@ async function handleLine(raw) {
 
 function handleEnding(ended) {
   gameOver = true;
-  if (ended && ended.id) {
-    const E = window.Engine;
-    const full = ended.kind === "finish" &&
-      E.getState().findings.length / E.FINDING_ORDER.length >= E.RULES.ending_full_ratio;
-    if (recordEnding(ended.id, full)) showToast(window.I18N.t("endings_new"));
-  }
   $("#cmd-input").disabled = true;
   window.SFX.ending();
   clearSave();
@@ -738,69 +724,6 @@ function handleEnding(ended) {
   printLine(window.I18N.t("session_ended_1"), "dim amber");
   printLine(window.I18N.t("session_ended_2"), "dim amber");
 }
-
-// ---------------------------------------------------------------------------
-// endings tracker (per browser): which endings were reached, and whether with
-// a full set of findings.
-// ---------------------------------------------------------------------------
-
-const ENDINGS_KEY = "silent-archive-endings";
-
-function readEndings() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(ENDINGS_KEY) || "{}");
-    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  } catch { return {}; }
-}
-
-// Returns true when this ending had never been reached before.
-function recordEnding(id, full) {
-  const seen = readEndings();
-  const isNew = !(id in seen);
-  seen[id] = full || seen[id] === "full" ? "full" : "partial";
-  try { localStorage.setItem(ENDINGS_KEY, JSON.stringify(seen)); } catch { /* ignore */ }
-  paintEndingsCount();
-  return isNew;
-}
-
-function paintEndingsCount() {
-  const E = window.Engine;
-  const el = $("#endings-count");
-  if (!el || !E.ENDING_IDS) return;
-  const n = Object.keys(readEndings()).filter((id) => E.ENDING_IDS.includes(id)).length;
-  el.textContent = n
-    ? window.I18N.t("endings_count").replace("{n}", n).replace("{t}", E.ENDING_IDS.length)
-    : "";
-}
-
-function openEndings() {
-  const E = window.Engine;
-  const t = window.I18N.t;
-  const seen = readEndings();
-  const list = $("#endings-list");
-  list.innerHTML = "";
-  for (const id of E.ENDING_IDS) {
-    const li = document.createElement("li");
-    if (seen[id]) {
-      li.className = "seen";
-      const title = E.T("endings", id, "title", { default: id }).replace(/^\s*(ENDING|SON|FINAL|FIN)\s*[—-]\s*/i, "");
-      li.textContent = title + "  [" + t(seen[id] === "full" ? "endings_full" : "endings_partial") + "]";
-    } else {
-      li.textContent = t("endings_locked");
-    }
-    list.appendChild(li);
-  }
-  $("#endings-modal").classList.remove("hidden");
-}
-
-function closeEndings() {
-  $("#endings-modal").classList.add("hidden");
-  const input = $("#cmd-input");
-  if (inGame && input && !input.disabled) input.focus();
-}
-
-$("#endings-btn").addEventListener("click", openEndings);
-$("#endings-close").addEventListener("click", closeEndings);
 
 // ---------------------------------------------------------------------------
 // persistence
@@ -849,7 +772,7 @@ const SAVEFILE_MAX_BYTES = 200000;
 // foreign file can't inject anything else into the game state.
 function sanitizeImported(raw) {
   const int = (v, lo, hi) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.trunc(v))) : undefined);
-  const strs = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.length <= 80).slice(0, 2000) : undefined);
+  const strs = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.length <= 80).slice(0, 6000) : undefined);
   const clean = {
     clearance: int(raw.clearance, 0, 10),
     contam: int(raw.contam, 0, 100),

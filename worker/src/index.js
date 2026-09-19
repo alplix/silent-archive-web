@@ -28,9 +28,9 @@
 // real limits, not that it was earned.
 
 const KEY_RE = /^[0-9a-f]{32}$/;
-const MAX_BODY_BYTES = 20000;
+const MAX_BODY_BYTES = 600000; // ~5000 read ids + up to 20000 recorded links
 const MIN_WRITE_GAP_MS = 10000;
-const MAX_XP = 10000; // 565 records * 5 + 303 findings * 15 + rests is ~7.4k
+const MAX_XP = 300000; // 4955 articles * 3 + 20000 links * 10 is the theoretical top
 const LEADERBOARD_ROWS = 50;
 const LEADERBOARD_CACHE_SECONDS = 120;
 const LIST_PAGES = 5; // up to 5000 players considered for the top list
@@ -85,8 +85,8 @@ function cleanState(s) {
     isInt(s.clearance, 0, 10) &&
     isInt(s.contam, 0, 100) &&
     isInt(s.day, 1, 50) &&
-    isStrList(s.read, 1000, 80) &&
-    isStrList(s.findings, 1000, 80) &&
+    isStrList(s.read, 6000, 80) &&
+    isStrList(s.findings, 20000, 40) &&
     isStrList(s.mail_read, 100, 20) &&
     isInt(s.amnestics, 0, 20) &&
     Array.isArray(s.thresholds_fired) && s.thresholds_fired.length <= 10 &&

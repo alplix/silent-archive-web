@@ -33,7 +33,6 @@
   <div class="panel">
     <button id="play-btn" class="play-btn" data-i18n="btn_play">...</button>
     <button id="signin-btn" class="link-btn signin-btn" data-i18n="btn_signin">...</button>
-    <p id="endings-count" class="small dim" style="text-align:center"></p>
   </div>
 </div>
 
@@ -44,7 +43,6 @@
     </span>
     <span class="topbar-actions">
       <button id="sfx-toggle" class="link-btn">🔊</button>
-      <button id="endings-btn" class="link-btn" data-i18n="endings_btn">…</button>
       <button id="fx-btn" class="link-btn" title="effects">&#128065;</button>
       <button id="theme-btn" class="link-btn" title="theme">&#9680;</button>
       <button id="account-btn" class="link-btn" data-i18n="acct_btn">…</button>
@@ -60,10 +58,6 @@
         <div class="stat-row"><span class="stat-label" data-i18n="st_clearance">…</span><span id="stat-clearance" class="stat-val"></span></div>
         <div class="stat-row"><span class="stat-label" data-i18n="st_findings">…</span><span id="stat-findings" class="stat-val"></span></div>
         <div class="stat-row"><span class="stat-label" data-i18n="st_ready">…</span><span id="stat-ready" class="stat-val"></span></div>
-        <div class="stat-block">
-          <div class="stat-block-top"><span class="stat-label" data-i18n="st_day">…</span><span id="stat-day" class="stat-val"></span></div>
-          <div class="meter"><div id="meter-day" class="meter-fill day"></div></div>
-        </div>
         <div class="stat-block">
           <div class="stat-block-top"><span class="stat-label" data-i18n="st_contam">…</span><span id="stat-contam-pct" class="stat-val"></span></div>
           <div class="meter"><div id="meter-contam" class="meter-fill"></div></div>
@@ -94,17 +88,6 @@
         <span id="prompt-tag">&gt;</span>
         <input type="text" id="cmd-input" autocomplete="off" autocapitalize="off" spellcheck="false">
       </div>
-    </div>
-  </div>
-</div>
-
-<div id="endings-modal" class="modal hidden">
-  <div class="modal-box">
-    <h2 data-i18n="endings_title">…</h2>
-    <p class="small" data-i18n="endings_help">…</p>
-    <ul id="endings-list"></ul>
-    <div class="modal-actions">
-      <button id="endings-close" class="secondary" data-i18n="btn_close">…</button>
     </div>
   </div>
 </div>
