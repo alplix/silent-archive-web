@@ -2,7 +2,7 @@
 
 Browser-playable version of the terminal SCP investigation game, with
 rank/XP progression, automatic resume-where-you-left-off saves and a
-leaderboard. The game and all content (565 records, 303 findings, four
+leaderboard. The game and all content (565 records, 303 findings, six
 languages) are identical to the original Python/terminal version — this repo
 just re-implements the same engine to run client-side, reading the same data
 files unchanged.
@@ -115,6 +115,8 @@ data/dil/en.json          unchanged copies from the original Python project
 data/dil/tr.json
 data/dil/es.json
 data/dil/fr.json
+data/dil/de.json
+data/dil/pt.json
 ```
 
 ## Features
@@ -129,7 +131,7 @@ data/dil/fr.json
   rank-ups, and rising/critical contamination — toggle sound off with the
   🔊 button in the topbar. A contamination "tension vignette" overlay adds
   visual pressure as the day and contamination meters climb.
-- **Four languages** (English, Türkçe, Español, Français) chosen from the
+- **Six languages** (English, Türkçe, Español, Français, Deutsch, Português) chosen from the
   dropdown at the top right, on every screen; it covers the whole site and
   all archive content, and can also be changed mid-game with `lang <code>`.
   Only English (the fallback) and the chosen language are downloaded, others
